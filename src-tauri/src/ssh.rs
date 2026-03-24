@@ -21,6 +21,7 @@ impl SshManager {
 pub enum SshCmd {
     Write(String),
     Resize(u32, u32),
+    #[allow(dead_code)]
     Close,
 }
 
