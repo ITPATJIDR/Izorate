@@ -20,7 +20,7 @@ jobs:
           - platform: 'ubuntu-22.04' # for Tauri v2 you could use ubuntu-22.04.
             args: ''
           - platform: 'windows-latest'
-            args: '--bundles none'
+            args: '--no-bundle'
 
     runs-on: ${{ matrix.platform }}
     steps:
