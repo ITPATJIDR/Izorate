@@ -5,7 +5,7 @@ import { STATUS_DOT, TYPE_ICON } from "../types/session";
 
 interface SessionSidebarProps {
 	sessions: Session[];
-	activeId: number;
+	activeId: number | null;
 	onSelect: (id: number) => void;
 	onNewSession: () => void;
 	onEditSession: (session: Session) => void;

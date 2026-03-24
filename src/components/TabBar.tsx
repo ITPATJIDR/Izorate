@@ -3,7 +3,7 @@ import { STATUS_DOT } from "../types/session";
 
 interface TabBarProps {
 	sessions: Session[];
-	activeId: number;
+	activeId: number | null;
 	onSelect: (id: number) => void;
 }
 

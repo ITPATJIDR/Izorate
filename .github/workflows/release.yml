@@ -20,7 +20,7 @@ jobs:
           - platform: 'ubuntu-22.04' # for Tauri v2 you could use ubuntu-22.04.
             args: ''
           - platform: 'windows-latest'
-            args: '--no-bundle'
+            args: ''
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -70,4 +70,4 @@ jobs:
         if: matrix.platform == 'windows-latest'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "app-v${{ github.ref_name }}" izorate-windows.zip --clobber
+        run: gh release upload "app-${{ github.ref_name }}" izorate-windows.zip --clobber
