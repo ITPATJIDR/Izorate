@@ -4,6 +4,7 @@ import { TopBar } from "./components/TopBar";
 import { TabBar } from "./components/TabBar";
 import { SessionSidebar } from "./components/SessionSidebar";
 import { TerminalPane } from "./components/TerminalPane";
+import { FileManagerPane } from "./components/FileManagerPane";
 import { AIPanel } from "./components/AIPanel";
 import { StatusBar } from "./components/StatusBar";
 import { NewConnectionModal } from "./components/NewConnectionModal";
@@ -12,6 +13,8 @@ import type { Session } from "./types/session";
 export default function App() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [activeId, setActiveId] = useState<number | null>(null);
+  const [openTabIds, setOpenTabIds] = useState<number[]>([]);
+  const [activeTab, setActiveTab] = useState("Sessions");
   const [showModal, setShowModal] = useState(false);
   const [editingSession, setEditingSession] = useState<Session | undefined>();
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -23,11 +26,29 @@ export default function App() {
     if (activeId && !updated.find(s => s.id === activeId)) {
       setActiveId(null);
     }
+    setOpenTabIds(prev => prev.filter(id => updated.some(s => s.id === id)));
   };
 
-  const handleDataChanged = () => {
+  const handleDataChanged = (newId?: number) => {
     // Triggers Sidebar to remount/fetch updated connections & groups from SQLite
     setRefreshTrigger(prev => prev + 1);
+    if (typeof newId === "number") {
+      handleSelectSession(newId);
+    }
+  };
+
+  const handleSelectSession = (id: number) => {
+    setActiveId(id);
+    setOpenTabIds(prev => prev.includes(id) ? prev : [...prev, id]);
+  };
+
+  const handleCloseTab = (id: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newTabs = openTabIds.filter(tid => tid !== id);
+    setOpenTabIds(newTabs);
+    if (activeId === id) {
+      setActiveId(newTabs.length > 0 ? newTabs[newTabs.length - 1] : null);
+    }
   };
 
   const handleNewSession = () => {
@@ -42,13 +63,20 @@ export default function App() {
 
   return (
     <div className="scanlines flex flex-col" style={{ height: "100vh", overflow: "hidden" }}>
-      <TopBar />
-      <TabBar sessions={sessions} activeId={activeId} onSelect={setActiveId} />
+      <TopBar connectedCount={openTabIds.length} activeTab={activeTab} hasActiveSession={activeId !== null} onTabChange={setActiveTab} />
+      <TabBar
+        sessions={sessions}
+        activeId={activeId}
+        openTabIds={openTabIds}
+        onSelect={handleSelectSession}
+        onClose={handleCloseTab}
+        onNew={handleNewSession}
+      />
       <div className="flex flex-1 overflow-hidden">
         <SessionSidebar
           sessions={sessions}
           activeId={activeId}
-          onSelect={setActiveId}
+          onSelect={handleSelectSession}
           onNewSession={handleNewSession}
           onEditSession={handleEditSession}
           onSessionsChanged={handleSessionsChanged}
@@ -57,7 +85,11 @@ export default function App() {
         />
         <div className="flex-1 flex flex-col overflow-hidden relative" style={{ background: "#050a05" }}>
           {activeSession ? (
-            <TerminalPane session={activeSession} />
+            activeTab === "Files" ? (
+              <FileManagerPane session={activeSession} />
+            ) : (
+              <TerminalPane session={activeSession} />
+            )
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center text-center select-none" style={{ opacity: 0.4 }}>
               <div className="text-6xl mb-4 crt-glow" style={{ color: "#00ff41" }}>🖧</div>

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
@@ -13,6 +13,7 @@ interface Props {
 export function TerminalPane({ session }: Props) {
 	const terminalRef = useRef<HTMLDivElement>(null);
 	const xtermRef = useRef<Terminal | null>(null);
+	const [refreshKey, setRefreshKey] = useState(0);
 
 	useEffect(() => {
 		if (!terminalRef.current) return;
@@ -97,7 +98,7 @@ export function TerminalPane({ session }: Props) {
 			// Attempt to safely close the session backend side when switching tabs
 			invoke("write_pty", { id: session.id, data: "exit\n" }).catch(() => { });
 		};
-	}, [session.id]); // Re-run when switching sessions
+	}, [session.id, refreshKey]); // Re-run when switching sessions or refreshing
 
 	return (
 		<div className="flex-1 flex flex-col bg-[#0a0a0a]">
@@ -111,6 +112,16 @@ export function TerminalPane({ session }: Props) {
 						{session.username}@{session.host}:{session.port || 22}
 					</span>
 				</div>
+				<button
+					onClick={() => setRefreshKey(prev => prev + 1)}
+					className="px-3 py-1 text-xs font-semibold rounded transition-colors"
+					style={{ color: "#00ff41", border: "1px solid #00ff4140", background: "transparent", cursor: "pointer" }}
+					onMouseEnter={(e) => e.currentTarget.style.background = "#00ff4120"}
+					onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+					title="Refresh Connection"
+				>
+					Refresh
+				</button>
 			</div>
 
 			{/* Terminal Container */}

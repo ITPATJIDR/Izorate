@@ -70,8 +70,8 @@ async fn connect_ssh(app: AppHandle, state: State<'_, DbState>, id: i64) -> Resu
 #[tauri::command]
 async fn write_pty(state: State<'_, ssh::SshManager>, id: i64, data: String) -> Result<(), String> {
     let mut map = state.active.lock().await;
-    if let Some(tx) = map.get_mut(&id) {
-        tx.send(ssh::SshCmd::Write(data)).await.map_err(|e| e.to_string())?;
+    if let Some(conn) = map.get_mut(&id) {
+        conn.tx.send(ssh::SshCmd::Write(data)).await.map_err(|e| e.to_string())?;
     }
     Ok(())
 }
@@ -79,10 +79,38 @@ async fn write_pty(state: State<'_, ssh::SshManager>, id: i64, data: String) -> 
 #[tauri::command]
 async fn resize_pty(state: State<'_, ssh::SshManager>, id: i64, cols: u32, rows: u32) -> Result<(), String> {
     let mut map = state.active.lock().await;
-    if let Some(tx) = map.get_mut(&id) {
-        tx.send(ssh::SshCmd::Resize(cols, rows)).await.map_err(|e| e.to_string())?;
+    if let Some(conn) = map.get_mut(&id) {
+        conn.tx.send(ssh::SshCmd::Resize(cols, rows)).await.map_err(|e| e.to_string())?;
     }
     Ok(())
+}
+
+#[derive(serde::Serialize)]
+struct SshStats {
+    rx: usize,
+    tx: usize,
+}
+
+#[tauri::command]
+async fn get_ssh_stats(state: State<'_, ssh::SshManager>, id: i64) -> Result<SshStats, String> {
+    let map = state.active.lock().await;
+    if let Some(conn) = map.get(&id) {
+        Ok(SshStats {
+            rx: conn.rx_bytes.load(std::sync::atomic::Ordering::Relaxed),
+            tx: conn.tx_bytes.load(std::sync::atomic::Ordering::Relaxed),
+        })
+    } else {
+        Err("Not found".into())
+    }
+}
+
+#[tauri::command]
+async fn measure_latency(host: String, port: u16) -> Result<u64, String> {
+    let start = std::time::Instant::now();
+    match tokio::net::TcpStream::connect((host.as_str(), port)).await {
+        Ok(_) => Ok(start.elapsed().as_millis() as u64),
+        Err(e) => Err(e.to_string())
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -106,7 +134,12 @@ pub fn run() {
             delete_connection,
             connect_ssh,
             write_pty,
-            resize_pty
+            resize_pty,
+            get_ssh_stats,
+            measure_latency,
+            ssh::list_sftp_directory,
+            ssh::upload_file,
+            ssh::download_file
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -14,7 +14,7 @@ interface ConnectionForm {
 
 interface Props {
 	onClose: () => void;
-	onSaved: () => void;
+	onSaved: (id?: number) => void;
 	editSession?: Session;
 }
 
@@ -123,11 +123,12 @@ export function NewConnectionModal({ onClose, onSaved, editSession }: Props) {
 
 			if (editSession) {
 				await invoke("update_connection", payload);
+				onSaved(editSession.id);
 			} else {
-				await invoke("add_connection", payload);
+				const newId = await invoke<number>("add_connection", payload);
+				onSaved(newId);
 			}
 
-			onSaved();
 			onClose();
 		} catch (err) {
 			setError(String(err));
