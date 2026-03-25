@@ -24,7 +24,7 @@ export function TopBar({ connectedCount, activeTab, hasActiveSession, onTabChang
 
 			{/* Center: Nav */}
 			<div className="flex gap-1">
-				{["Sessions", "Files", "Tools", "Keys", "AI Assistant"].map((item) => {
+				{["Sessions", "Files", "Tools", "Keys", "Settings", "AI Assistant"].map((item) => {
 					const isActive = item === activeTab;
 					const isDisabled = item === "Files" && !hasActiveSession;
 					return (

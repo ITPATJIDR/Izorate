@@ -2,8 +2,10 @@ mod db;
 mod ssh;
 
 use std::sync::Mutex as StdMutex;
+use std::fs;
+use std::path::PathBuf;
 use rusqlite::Connection;
-use tauri::{State, AppHandle};
+use tauri::{State, AppHandle, Manager};
 use db::ConnectionConfig;
 
 struct DbState(StdMutex<Connection>);
@@ -113,6 +115,41 @@ async fn measure_latency(host: String, port: u16) -> Result<u64, String> {
     }
 }
 
+#[tauri::command]
+fn get_izorate_setting(app: AppHandle, key: String) -> Result<Option<String>, String> {
+    let state = app.state::<DbState>();
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    db::get_setting(&conn, &key).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn set_izorate_setting(app: AppHandle, key: String, value: String) -> Result<(), String> {
+    let state = app.state::<DbState>();
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    db::set_setting(&conn, &key, &value).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn save_terminal_video(app: AppHandle, bytes: Vec<u8>, filename: String) -> Result<String, String> {
+    let state = app.state::<DbState>();
+    let path = {
+        let conn = state.0.lock().map_err(|e| e.to_string())?;
+        db::get_setting(&conn, "recording_path")
+            .map_err(|e| e.to_string())?
+            .unwrap_or_else(|| std::env::temp_dir().to_string_lossy().to_string())
+    };
+    
+    let mut full_path = PathBuf::from(path);
+    if !full_path.exists() {
+        fs::create_dir_all(&full_path).map_err(|e| e.to_string())?;
+    }
+    full_path.push(filename);
+    
+    fs::write(&full_path, bytes).map_err(|e| e.to_string())?;
+    
+    Ok(full_path.to_string_lossy().to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Keep sqlite file locally
@@ -139,7 +176,10 @@ pub fn run() {
             measure_latency,
             ssh::list_sftp_directory,
             ssh::upload_file,
-            ssh::download_file
+            ssh::download_file,
+            get_izorate_setting,
+            set_izorate_setting,
+            save_terminal_video
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

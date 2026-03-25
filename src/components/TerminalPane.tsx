@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
+import { WebglAddon } from "@xterm/addon-webgl";
 import "@xterm/xterm/css/xterm.css";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -13,7 +14,10 @@ interface Props {
 export function TerminalPane({ session }: Props) {
 	const terminalRef = useRef<HTMLDivElement>(null);
 	const xtermRef = useRef<Terminal | null>(null);
+	const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+	const chunksRef = useRef<Blob[]>([]);
 	const [refreshKey, setRefreshKey] = useState(0);
+	const [isRecording, setIsRecording] = useState(false);
 
 	useEffect(() => {
 		if (!terminalRef.current) return;
@@ -33,7 +37,17 @@ export function TerminalPane({ session }: Props) {
 
 		const fitAddon = new FitAddon();
 		term.loadAddon(fitAddon);
+
 		term.open(terminalRef.current);
+
+		/*
+		try {
+			const webglAddon = new WebglAddon();
+			term.loadAddon(webglAddon);
+		} catch (e) {
+			console.warn("WebGL addon failed to load, falling back to DOM renderer", e);
+		}
+		*/
 
 		// Slight delay to ensure DOM is ready for fit calculation
 		setTimeout(() => {
@@ -100,6 +114,60 @@ export function TerminalPane({ session }: Props) {
 		};
 	}, [session.id, refreshKey]); // Re-run when switching sessions or refreshing
 
+	const startRecording = () => {
+		if (!terminalRef.current) return;
+		const canvas = terminalRef.current.querySelector('canvas.xterm-webgl-layer')
+			|| terminalRef.current.querySelector('canvas.xterm-link-layer')
+			|| terminalRef.current.querySelector('canvas.xterm-text-layer')
+			|| terminalRef.current.querySelector('canvas');
+
+		if (!canvas) {
+			console.error("Canvas element not found for recording");
+			return;
+		}
+
+		try {
+			// @ts-ignore - captureStream might not be in the typings but exists in browsers
+			const stream = canvas.captureStream(30);
+			const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
+
+			chunksRef.current = [];
+			recorder.ondataavailable = (e) => {
+				if (e.data.size > 0) chunksRef.current.push(e.data);
+			};
+
+			recorder.onstop = async () => {
+				const blob = new Blob(chunksRef.current, { type: 'video/webm' });
+				const arrayBuffer = await blob.arrayBuffer();
+				const bytes = new Uint8Array(arrayBuffer);
+				const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+				const filename = `terminal-${session.name}-${timestamp}.webm`;
+
+				try {
+					await invoke("save_terminal_video", { bytes: Array.from(bytes), filename });
+					alert(`Recording saved as ${filename}`);
+				} catch (err) {
+					console.error("Failed to save recording:", err);
+					alert(`Failed to save recording: ${err}`);
+				}
+			};
+
+			recorder.start();
+			mediaRecorderRef.current = recorder;
+			setIsRecording(true);
+		} catch (err) {
+			console.error("Failed to start recording:", err);
+			alert("Failed to start recording. MediaRecorder might not be supported or canvas capture failed.");
+		}
+	};
+
+	const stopRecording = () => {
+		if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+			mediaRecorderRef.current.stop();
+			setIsRecording(false);
+		}
+	};
+
 	return (
 		<div className="flex-1 flex flex-col bg-[#0a0a0a]">
 			{/* Header */}
@@ -112,16 +180,29 @@ export function TerminalPane({ session }: Props) {
 						{session.username}@{session.host}:{session.port || 22}
 					</span>
 				</div>
-				<button
-					onClick={() => setRefreshKey(prev => prev + 1)}
-					className="px-3 py-1 text-xs font-semibold rounded transition-colors"
-					style={{ color: "#00ff41", border: "1px solid #00ff4140", background: "transparent", cursor: "pointer" }}
-					onMouseEnter={(e) => e.currentTarget.style.background = "#00ff4120"}
-					onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-					title="Refresh Connection"
-				>
-					Refresh
-				</button>
+				<div className="flex items-center gap-2">
+					{/* 
+					<button
+						onClick={isRecording ? stopRecording : startRecording}
+						className={`px-3 py-1 text-xs font-semibold rounded flex items-center gap-2 transition-all ${isRecording ? "bg-red-500/20 text-red-500 border border-red-500/40 animate-pulse" : "text-[#888] border border-[#4a6e4a40]"
+							}`}
+						title={isRecording ? "Stop Recording" : "Start Recording"}
+					>
+						<span className={`w-2 h-2 rounded-full ${isRecording ? "bg-red-500" : "bg-[#4a6e4a]"}`} />
+						{isRecording ? "Stop Rec" : "Record"}
+					</button>
+					*/}
+					<button
+						onClick={() => setRefreshKey(prev => prev + 1)}
+						className="px-3 py-1 text-xs font-semibold rounded transition-colors"
+						style={{ color: "#00ff41", border: "1px solid #00ff4140", background: "transparent", cursor: "pointer" }}
+						onMouseEnter={(e) => e.currentTarget.style.background = "#00ff4120"}
+						onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+						title="Refresh Connection"
+					>
+						Refresh
+					</button>
+				</div>
 			</div>
 
 			{/* Terminal Container */}

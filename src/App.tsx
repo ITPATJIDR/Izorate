@@ -5,6 +5,7 @@ import { TabBar } from "./components/TabBar";
 import { SessionSidebar } from "./components/SessionSidebar";
 import { TerminalPane } from "./components/TerminalPane";
 import { FileManagerPane } from "./components/FileManagerPane";
+import { SettingsPane } from "./components/SettingsPane";
 import { AIPanel } from "./components/AIPanel";
 import { StatusBar } from "./components/StatusBar";
 import { NewConnectionModal } from "./components/NewConnectionModal";
@@ -87,9 +88,13 @@ export default function App() {
           {activeSession ? (
             activeTab === "Files" ? (
               <FileManagerPane session={activeSession} />
+            ) : activeTab === "Settings" ? (
+              <SettingsPane />
             ) : (
               <TerminalPane session={activeSession} />
             )
+          ) : activeTab === "Settings" ? (
+            <SettingsPane />
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center text-center select-none" style={{ opacity: 0.4 }}>
               <div className="text-6xl mb-4 crt-glow" style={{ color: "#00ff41" }}>🖧</div>

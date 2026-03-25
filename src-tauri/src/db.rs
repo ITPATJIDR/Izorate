@@ -30,6 +30,10 @@ pub fn init_db(conn: &Connection) -> Result<()> {
             username   TEXT NOT NULL,
             password   TEXT,
             group_name TEXT NOT NULL DEFAULT 'Default'
+        );
+        CREATE TABLE IF NOT EXISTS settings (
+            key   TEXT PRIMARY KEY,
+            value TEXT NOT NULL
         );",
     )
 }
@@ -104,5 +108,24 @@ pub fn update(conn: &Connection, cfg: &ConnectionConfig) -> Result<()> {
 
 pub fn delete(conn: &Connection, id: i64) -> Result<()> {
     conn.execute("DELETE FROM connections WHERE id=?1", params![id])?;
+    Ok(())
+}
+
+pub fn get_setting(conn: &Connection, key: &str) -> Result<Option<String>> {
+    let mut stmt = conn.prepare("SELECT value FROM settings WHERE key = ?1")?;
+    let mut rows = stmt.query_map(params![key], |row| row.get(0))?;
+    if let Some(res) = rows.next() {
+        Ok(Some(res?))
+    } else {
+        Ok(None)
+    }
+}
+
+pub fn set_setting(conn: &Connection, key: &str, value: &str) -> Result<()> {
+    conn.execute(
+        "INSERT INTO settings (key, value) VALUES (?1, ?2)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        params![key, value],
+    )?;
     Ok(())
 }
