@@ -53,15 +53,63 @@ pub async fn connect_to_server(app: AppHandle, id: i64, config: ConnectionConfig
     let mut session = client::connect(ssh_config, host_port, DummyHandler).await
         .map_err(|e| format!("Connect error: {}", e))?;
 
+    let rx_counter = Arc::new(AtomicUsize::new(0));
+    let tx_counter = Arc::new(AtomicUsize::new(0));
+    
+    // Set up mpsc channel for React -> Rust commands
+    let (tx, mut rx) = mpsc::channel::<SshCmd>(100);
+
+    // Save tx to state EARLY so we can receive password from write_pty if needed
+    {
+        let state = app.state::<SshManager>();
+        state.active.lock().await.insert(id, SshConnection {
+            tx: tx.clone(),
+            rx_bytes: rx_counter.clone(),
+            tx_bytes: tx_counter.clone(),
+            sftp: None,
+        });
+    }
+
     // Authenticate
-    let auth_res = if let Some(pwd) = config.password {
+    let auth_status = if let Some(pwd) = config.password {
         session.authenticate_password(config.username, pwd).await
+            .map_err(|e| format!("Auth error: {}", e))?
     } else {
-        return Err("Key auth not yet implemented. Please use password.".into());
+        // Manual password prompt
+        let _ = app.emit(&format!("ssh-out-{}", id), format!("\r\n[Izorate] Password for {}@{}: ", config.username, config.host));
+        
+        let mut pwd_buf = String::new();
+        loop {
+            match rx.recv().await {
+                Some(SshCmd::Write(data)) => {
+                    if data == "\r" || data == "\n" {
+                        let _ = app.emit(&format!("ssh-out-{}", id), "\r\n");
+                        break;
+                    } else if data == "\x7f" || data == "\x08" { // Backspace
+                        pwd_buf.pop();
+                    } else if data.len() == 1 {
+                        // Collect but don't echo
+                        pwd_buf.push_str(&data);
+                    } else {
+                        // Likely a paste or chunk
+                        pwd_buf.push_str(&data);
+                    }
+                }
+                _ => {
+                    let state = app.state::<SshManager>();
+                    state.active.lock().await.remove(&id);
+                    return Err("Connection aborted or channel closed".into());
+                }
+            }
+        }
+        session.authenticate_password(config.username, pwd_buf).await
+            .map_err(|e| format!("Auth error: {}", e))?
     };
 
-    let auth_status = auth_res.map_err(|e| format!("Auth error: {}", e))?;
     if !matches!(auth_status, russh::client::AuthResult::Success) {
+        let state = app.state::<SshManager>();
+        state.active.lock().await.remove(&id);
+        let _ = app.emit(&format!("ssh-out-{}", id), "\r\n\x1b[31m[Authentication Failed]\x1b[0m\r\n");
         return Err("Authentication failed".into());
     }
 
@@ -76,17 +124,12 @@ pub async fn connect_to_server(app: AppHandle, id: i64, config: ConnectionConfig
     channel.request_shell(true).await
         .map_err(|e| format!("Shell error: {}", e))?;
 
-    let rx_counter = Arc::new(AtomicUsize::new(0));
-    let tx_counter = Arc::new(AtomicUsize::new(0));
     let rx_c = rx_counter.clone();
     let tx_c = tx_counter.clone();
 
-    // Set up mpsc channel for React -> Rust commands
-    let (tx, mut rx) = mpsc::channel::<SshCmd>(100);
-
     // Try to open an SFTP channel as well
-    let mut sftp_channel_res = session.channel_open_session().await;
-    let sftp = if let Ok(mut sftp_channel) = sftp_channel_res {
+    let sftp_channel_res = session.channel_open_session().await;
+    let sftp = if let Ok(sftp_channel) = sftp_channel_res {
         if sftp_channel.request_subsystem(true, "sftp").await.is_ok() {
             let stream = sftp_channel.into_stream();
             if let Ok(sftp_session) = SftpSession::new(stream).await {
@@ -95,14 +138,14 @@ pub async fn connect_to_server(app: AppHandle, id: i64, config: ConnectionConfig
         } else { None }
     } else { None };
 
-    // Save tx to state
-    let state = app.state::<SshManager>();
-    state.active.lock().await.insert(id, SshConnection {
-        tx,
-        rx_bytes: rx_counter,
-        tx_bytes: tx_counter,
-        sftp,
-    });
+    // Update the connection with SFTP session
+    {
+        let state = app.state::<SshManager>();
+        let mut active = state.active.lock().await;
+        if let Some(conn) = active.get_mut(&id) {
+            conn.sftp = sftp;
+        }
+    }
 
     // Tell React we connected
     app.emit(&format!("ssh-connected-{}", id), ()).unwrap_or(());
@@ -170,7 +213,7 @@ pub async fn list_sftp_directory(state: tauri::State<'_, SshManager>, id: i64, p
         .and_then(|c| c.sftp.clone())
         .ok_or("SFTP not available on this session")?;
         
-    let mut sftp = sftp_arc.lock().await;
+    let sftp = sftp_arc.lock().await;
     let dir = sftp.read_dir(path).await.map_err(|e| e.to_string())?;
     
     let mut files = Vec::new();
@@ -178,7 +221,6 @@ pub async fn list_sftp_directory(state: tauri::State<'_, SshManager>, id: i64, p
         let name = entry.file_name();
         
         let mut is_dir = false;
-        let mut size = 0;
         let mut modified = 0;
         
         let file_type = entry.file_type();
@@ -186,7 +228,7 @@ pub async fn list_sftp_directory(state: tauri::State<'_, SshManager>, id: i64, p
             is_dir = true;
         }
         let meta = entry.metadata();
-        size = meta.len();
+        let size = meta.len();
         
         if let Ok(m) = meta.modified() {
             if let Ok(duration) = m.duration_since(std::time::UNIX_EPOCH) {
@@ -207,7 +249,7 @@ pub async fn upload_file(state: tauri::State<'_, SshManager>, id: i64, local_pat
         .and_then(|c| c.sftp.clone())
         .ok_or("SFTP not available on this session")?;
         
-    let mut sftp = sftp_arc.lock().await;
+    let sftp = sftp_arc.lock().await;
     let data = tokio::fs::read(&local_path).await.map_err(|e| e.to_string())?;
     
     let mut file = sftp.create(&remote_path).await.map_err(|e| e.to_string())?;

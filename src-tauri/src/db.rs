@@ -34,6 +34,11 @@ pub fn init_db(conn: &Connection) -> Result<()> {
         CREATE TABLE IF NOT EXISTS settings (
             key   TEXT PRIMARY KEY,
             value TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS clipboard_history (
+            id        INTEGER PRIMARY KEY AUTOINCREMENT,
+            content   TEXT NOT NULL,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
         );",
     )
 }
@@ -126,6 +131,14 @@ pub fn set_setting(conn: &Connection, key: &str, value: &str) -> Result<()> {
         "INSERT INTO settings (key, value) VALUES (?1, ?2)
          ON CONFLICT(key) DO UPDATE SET value = excluded.value",
         params![key, value],
+    )?;
+    Ok(())
+}
+
+pub fn add_clipboard_history(conn: &Connection, content: &str) -> Result<()> {
+    conn.execute(
+        "INSERT INTO clipboard_history (content) VALUES (?1)",
+        params![content],
     )?;
     Ok(())
 }

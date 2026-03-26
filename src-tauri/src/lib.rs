@@ -130,6 +130,13 @@ fn set_izorate_setting(app: AppHandle, key: String, value: String) -> Result<(),
 }
 
 #[tauri::command]
+fn save_clipboard_history(app: AppHandle, content: String) -> Result<(), String> {
+    let state = app.state::<DbState>();
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    db::add_clipboard_history(&conn, &content).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 async fn save_terminal_video(app: AppHandle, bytes: Vec<u8>, filename: String) -> Result<String, String> {
     let state = app.state::<DbState>();
     let path = {
@@ -179,6 +186,7 @@ pub fn run() {
             ssh::download_file,
             get_izorate_setting,
             set_izorate_setting,
+            save_clipboard_history,
             save_terminal_video
         ])
         .run(tauri::generate_context!())

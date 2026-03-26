@@ -221,7 +221,7 @@ export function NewConnectionModal({ onClose, onSaved, editSession }: Props) {
 
 					<Field label="Password">
 						<Input
-							placeholder={editSession ? "leave blank to keep unchanged" : "leave blank to use SSH key"}
+							placeholder={editSession ? "leave blank to keep unchanged" : "leave blank to prompt in terminal"}
 							value={form.password}
 							onChange={v => handleChange("password", v)}
 							type="password"

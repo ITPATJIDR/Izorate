@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
-import { WebglAddon } from "@xterm/addon-webgl";
 import "@xterm/xterm/css/xterm.css";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -14,10 +13,12 @@ interface Props {
 export function TerminalPane({ session }: Props) {
 	const terminalRef = useRef<HTMLDivElement>(null);
 	const xtermRef = useRef<Terminal | null>(null);
+	const fitAddonRef = useRef<FitAddon | null>(null);
 	const mediaRecorderRef = useRef<MediaRecorder | null>(null);
 	const chunksRef = useRef<Blob[]>([]);
 	const [refreshKey, setRefreshKey] = useState(0);
 	const [isRecording, setIsRecording] = useState(false);
+	const [fontSize, setFontSize] = useState(14);
 
 	useEffect(() => {
 		if (!terminalRef.current) return;
@@ -31,23 +32,16 @@ export function TerminalPane({ session }: Props) {
 				selectionBackground: "#00ff4140",
 			},
 			fontFamily: "'Fira Code', 'Courier New', monospace",
-			fontSize: 14,
+			fontSize: fontSize,
 			cursorBlink: true,
+			allowProposedApi: true,
 		});
 
 		const fitAddon = new FitAddon();
+		fitAddonRef.current = fitAddon;
 		term.loadAddon(fitAddon);
 
 		term.open(terminalRef.current);
-
-		/*
-		try {
-			const webglAddon = new WebglAddon();
-			term.loadAddon(webglAddon);
-		} catch (e) {
-			console.warn("WebGL addon failed to load, falling back to DOM renderer", e);
-		}
-		*/
 
 		// Slight delay to ensure DOM is ready for fit calculation
 		setTimeout(() => {
@@ -95,15 +89,76 @@ export function TerminalPane({ session }: Props) {
 			invoke("resize_pty", { id: session.id, cols, rows }).catch(console.error);
 		});
 
+		// Auto-copy on selection
+		const onSelectionDisp = term.onSelectionChange(() => {
+			const selection = term.getSelection();
+			if (selection && selection.length > 0) {
+				navigator.clipboard.writeText(selection).then(() => {
+					invoke("save_clipboard_history", { content: selection }).catch(console.error);
+				}).catch(console.error);
+			}
+		});
+
 		const handleWindowResize = () => {
 			try { fitAddon.fit(); } catch (e) { }
 		};
+
+		const handleKeyDown = (e: KeyboardEvent) => {
+			if (e.ctrlKey || e.metaKey) {
+				if (e.key === '=' || e.key === '+') {
+					e.preventDefault();
+					setFontSize(prev => Math.min(prev + 1, 30));
+				} else if (e.key === '-') {
+					e.preventDefault();
+					setFontSize(prev => Math.max(prev - 1, 8));
+				} else if (e.key === '0') {
+					e.preventDefault();
+					setFontSize(14);
+				}
+			}
+		};
+
+		const handleWheel = (e: WheelEvent) => {
+			if (e.ctrlKey || e.metaKey) {
+				e.preventDefault();
+				if (e.deltaY < 0) {
+					setFontSize(prev => Math.min(prev + 1, 30));
+				} else {
+					setFontSize(prev => Math.max(prev - 1, 8));
+				}
+			}
+		};
+
+		const handleContextMenu = async (e: MouseEvent) => {
+			e.preventDefault();
+			try {
+				const text = await navigator.clipboard.readText();
+				if (text) {
+					term.paste(text);
+				}
+			} catch (err) {
+				console.error("Failed to read clipboard:", err);
+			}
+		};
+
 		window.addEventListener("resize", handleWindowResize);
+		const terminalEl = terminalRef.current;
+		if (terminalEl) {
+			terminalEl.addEventListener("keydown", handleKeyDown, true);
+			terminalEl.addEventListener("wheel", handleWheel, { passive: false });
+			terminalEl.addEventListener("contextmenu", handleContextMenu);
+		}
 
 		return () => {
 			window.removeEventListener("resize", handleWindowResize);
+			if (terminalEl) {
+				terminalEl.removeEventListener("keydown", handleKeyDown, true);
+				terminalEl.removeEventListener("wheel", handleWheel);
+				terminalEl.removeEventListener("contextmenu", handleContextMenu);
+			}
 			onDataDisp.dispose();
 			onResizeDisp.dispose();
+			onSelectionDisp.dispose();
 			term.dispose();
 			if (unlistenOut) unlistenOut();
 			if (unlistenConnected) unlistenConnected();
@@ -113,6 +168,15 @@ export function TerminalPane({ session }: Props) {
 			invoke("write_pty", { id: session.id, data: "exit\n" }).catch(() => { });
 		};
 	}, [session.id, refreshKey]); // Re-run when switching sessions or refreshing
+
+	useEffect(() => {
+		if (xtermRef.current && fitAddonRef.current) {
+			xtermRef.current.options.fontSize = fontSize;
+			try {
+				fitAddonRef.current.fit();
+			} catch (e) { }
+		}
+	}, [fontSize]);
 
 	const startRecording = () => {
 		if (!terminalRef.current) return;
@@ -128,7 +192,7 @@ export function TerminalPane({ session }: Props) {
 
 		try {
 			// @ts-ignore - captureStream might not be in the typings but exists in browsers
-			const stream = canvas.captureStream(30);
+			const stream = (canvas as any).captureStream(30);
 			const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
 
 			chunksRef.current = [];
@@ -181,17 +245,6 @@ export function TerminalPane({ session }: Props) {
 					</span>
 				</div>
 				<div className="flex items-center gap-2">
-					{/* 
-					<button
-						onClick={isRecording ? stopRecording : startRecording}
-						className={`px-3 py-1 text-xs font-semibold rounded flex items-center gap-2 transition-all ${isRecording ? "bg-red-500/20 text-red-500 border border-red-500/40 animate-pulse" : "text-[#888] border border-[#4a6e4a40]"
-							}`}
-						title={isRecording ? "Stop Recording" : "Start Recording"}
-					>
-						<span className={`w-2 h-2 rounded-full ${isRecording ? "bg-red-500" : "bg-[#4a6e4a]"}`} />
-						{isRecording ? "Stop Rec" : "Record"}
-					</button>
-					*/}
 					<button
 						onClick={() => setRefreshKey(prev => prev + 1)}
 						className="px-3 py-1 text-xs font-semibold rounded transition-colors"
@@ -206,8 +259,8 @@ export function TerminalPane({ session }: Props) {
 			</div>
 
 			{/* Terminal Container */}
-			<div className="flex-1 relative overflow-hidden p-2">
-				<div ref={terminalRef} className="w-full h-full" style={{ paddingLeft: '4px' }} />
+			<div className="flex-1 relative overflow-hidden">
+				<div ref={terminalRef} className="absolute inset-0" style={{ padding: '8px 4px 8px 8px' }} />
 			</div>
 		</div>
 	);
