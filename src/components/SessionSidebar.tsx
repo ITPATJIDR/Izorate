@@ -12,6 +12,7 @@ interface SessionSidebarProps {
 	onSessionsChanged: (sessions: Session[]) => void;
 	onDataChanged: () => void;
 	refreshTrigger: number;
+	width?: number;
 }
 
 type ContextMenuState = { x: number; y: number } & (
@@ -28,18 +29,29 @@ export function SessionSidebar({
 	onSessionsChanged,
 	onDataChanged,
 	refreshTrigger,
+	width = 220,
 }: SessionSidebarProps) {
 	const [filter, setFilter] = useState("");
 	const [dbGroups, setDbGroups] = useState<string[]>([]);
 	const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 	const [isCreatingGroup, setIsCreatingGroup] = useState(false);
 	const [newGroupName, setNewGroupName] = useState("");
+	const [dragOverGroup, setDragOverGroup] = useState<string | null>(null);
 
 	const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 
+	const handleMoveToGroup = async (sessionId: number, groupName: string) => {
+		try {
+			await invoke("move_connection_group", { id: sessionId, groupName });
+			onDataChanged();
+		} catch (err) {
+			console.error("Failed to move session:", err);
+		}
+	};
+
 	useEffect(() => {
 		Promise.all([
-			invoke<{ id: number; name: string; host: string; port: number; conn_type: string; username: string; group_name: string; }[]>("get_connections"),
+			invoke<{ id: number; name: string; host: string; port: number; conn_type: string; username: string; group_name: string; password?: string }[]>("get_connections"),
 			invoke<string[]>("get_groups").catch(() => ["Default"])
 		])
 			.then(([conns, groups]) => {
@@ -54,6 +66,7 @@ export function SessionSidebar({
 						status: "disconnected",
 						group: c.group_name,
 						username: c.username,
+						password: c.password,
 					}));
 					onSessionsChanged(mapped);
 				} else {
@@ -140,7 +153,7 @@ export function SessionSidebar({
 		: [...new Set(filtered.map(s => s.group))];
 
 	return (
-		<div className="relative flex flex-col h-full" style={{ width: "220px", background: "#0d0d0d", borderRight: "1px solid #00ff4115" }}>
+		<div className="relative flex flex-col h-full shrink-0" style={{ width: `${width}px`, background: "#0d0d0d", borderRight: "1px solid #00ff4115" }}>
 			{/* Search & Add Group Header */}
 			<div className="flex flex-col gap-2 p-2 border-b" style={{ borderColor: "#00ff4115" }}>
 				<div className="flex items-center gap-2 px-2 py-1.5 rounded" style={{ background: "#0f1a0f", border: "1px solid #00ff4125" }}>
@@ -186,8 +199,24 @@ export function SessionSidebar({
 				{displayGroups.map(group => {
 					const groupSessions = filtered.filter(s => s.group === group);
 					const isCollapsed = collapsedGroups.has(group);
+					const isDragOver = dragOverGroup === group;
+
 					return (
-						<div key={group} className="mb-1">
+						<div
+							key={group}
+							className={`mb-1 transition-colors duration-200 ${isDragOver ? "bg-[#00ff4110] border-y border-[#00ff4120]" : ""}`}
+							onDragOver={e => {
+								e.preventDefault();
+								if (dragOverGroup !== group) setDragOverGroup(group);
+							}}
+							onDragLeave={() => setDragOverGroup(null)}
+							onDrop={e => {
+								e.preventDefault();
+								setDragOverGroup(null);
+								const sessionId = e.dataTransfer.getData("sessionId");
+								if (sessionId) handleMoveToGroup(Number(sessionId), group);
+							}}
+						>
 							<button
 								onClick={() => toggleGroup(group)}
 								onContextMenu={e => {
@@ -198,7 +227,7 @@ export function SessionSidebar({
 									}
 								}}
 								className="w-full px-3 py-1.5 flex items-center gap-1 text-xs font-semibold tracking-widest transition-colors hover:bg-black/20"
-								style={{ color: "#00ff4150" }}
+								style={{ color: isDragOver ? "#00ff41" : "#00ff4150" }}
 							>
 								<span>{isCollapsed ? "▸" : "▾"}</span>
 								{group.toUpperCase()}
@@ -217,13 +246,18 @@ export function SessionSidebar({
 									{groupSessions.map(session => (
 										<button
 											key={session.id}
+											draggable
+											onDragStart={e => {
+												e.dataTransfer.setData("sessionId", session.id.toString());
+												// Add a ghost image or just let default handle it
+											}}
 											onClick={() => onSelect(session.id)}
 											onContextMenu={e => {
 												e.preventDefault();
 												e.stopPropagation();
 												setContextMenu({ x: e.pageX, y: e.pageY, type: "session", session });
 											}}
-											className="w-full flex items-center gap-2 px-4 py-1.5 text-left transition-all duration-150"
+											className="w-full flex items-center gap-2 px-4 py-1.5 text-left transition-all duration-150 cursor-grab active:cursor-grabbing"
 											style={{
 												background: activeId === session.id ? "#0f2a0f" : "transparent",
 												borderLeft: activeId === session.id ? "2px solid #00ff41" : "2px solid transparent",

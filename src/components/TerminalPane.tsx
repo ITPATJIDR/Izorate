@@ -19,6 +19,15 @@ export function TerminalPane({ session }: Props) {
 	const [refreshKey, setRefreshKey] = useState(0);
 	const [isRecording, setIsRecording] = useState(false);
 	const [fontSize, setFontSize] = useState(14);
+	const [fontColor, setFontColor] = useState("#00ff41");
+
+	useEffect(() => {
+		invoke<string | null>("get_izorate_setting", { key: "terminal_font_color" })
+			.then(color => {
+				if (color) setFontColor(color);
+			})
+			.catch(console.error);
+	}, []);
 
 	useEffect(() => {
 		if (!terminalRef.current) return;
@@ -27,9 +36,9 @@ export function TerminalPane({ session }: Props) {
 		const term = new Terminal({
 			theme: {
 				background: "#0a0a0a",
-				foreground: "#00ff41",
-				cursor: "#00ff41",
-				selectionBackground: "#00ff4140",
+				foreground: fontColor,
+				cursor: fontColor,
+				selectionBackground: `${fontColor}40`,
 			},
 			fontFamily: "'Fira Code', 'Courier New', monospace",
 			fontSize: fontSize,
@@ -178,6 +187,17 @@ export function TerminalPane({ session }: Props) {
 		}
 	}, [fontSize]);
 
+	useEffect(() => {
+		if (xtermRef.current) {
+			xtermRef.current.options.theme = {
+				background: "#0a0a0a",
+				foreground: fontColor,
+				cursor: fontColor,
+				selectionBackground: `${fontColor}40`,
+			};
+		}
+	}, [fontColor]);
+
 	const startRecording = () => {
 		if (!terminalRef.current) return;
 		const canvas = terminalRef.current.querySelector('canvas.xterm-webgl-layer')
@@ -237,7 +257,7 @@ export function TerminalPane({ session }: Props) {
 			{/* Header */}
 			<div className="flex items-center justify-between px-4 py-2 border-b" style={{ borderColor: "#00ff4120", background: "#0d0d0d" }}>
 				<div className="flex items-center gap-2">
-					<span className="text-sm font-semibold crt-glow" style={{ color: "#00ff41" }}>
+					<span className="text-sm font-semibold crt-glow" style={{ color: fontColor }}>
 						{session.name}
 					</span>
 					<span className="text-xs" style={{ color: "#4a6e4a" }}>
@@ -248,8 +268,8 @@ export function TerminalPane({ session }: Props) {
 					<button
 						onClick={() => setRefreshKey(prev => prev + 1)}
 						className="px-3 py-1 text-xs font-semibold rounded transition-colors"
-						style={{ color: "#00ff41", border: "1px solid #00ff4140", background: "transparent", cursor: "pointer" }}
-						onMouseEnter={(e) => e.currentTarget.style.background = "#00ff4120"}
+						style={{ color: fontColor, border: `1px solid ${fontColor}40`, background: "transparent", cursor: "pointer" }}
+						onMouseEnter={(e) => e.currentTarget.style.background = `${fontColor}20`}
 						onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
 						title="Refresh Connection"
 					>

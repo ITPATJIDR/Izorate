@@ -10,6 +10,7 @@ export interface Session {
   status: SessionStatus;
   group: string;
   username?: string;
+  password?: string;
 }
 
 export const STATUS_COLORS: Record<SessionStatus, string> = {

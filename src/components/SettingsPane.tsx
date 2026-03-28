@@ -2,16 +2,35 @@ import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
 export function SettingsPane() {
-	const [activeCategory, setActiveCategory] = useState("Recording");
+	const [activeCategory, setActiveCategory] = useState("Terminal");
 	const [recordingPath, setRecordingPath] = useState("");
+	const [terminalFontColor, setTerminalFontColor] = useState("#00ff41");
+
+	const [aiProvider, setAiProvider] = useState("OpenAI");
+	const [openaiApiKey, setOpenaiApiKey] = useState("");
+	const [anthropicApiKey, setAnthropicApiKey] = useState("");
+	const [geminiApiKey, setGeminiApiKey] = useState("");
+
 	const [loading, setLoading] = useState(true);
 	const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
 	useEffect(() => {
 		const loadSettings = async () => {
 			try {
-				const path = await invoke<string | null>("get_izorate_setting", { key: "recording_path" });
+				const [path, color, provider, oak, aak, gak] = await Promise.all([
+					invoke<string | null>("get_izorate_setting", { key: "recording_path" }),
+					invoke<string | null>("get_izorate_setting", { key: "terminal_font_color" }),
+					invoke<string | null>("get_izorate_setting", { key: "ai_provider" }),
+					invoke<string | null>("get_izorate_setting", { key: "openai_api_key" }),
+					invoke<string | null>("get_izorate_setting", { key: "anthropic_api_key" }),
+					invoke<string | null>("get_izorate_setting", { key: "gemini_api_key" }),
+				]);
 				setRecordingPath(path || "");
+				setTerminalFontColor(color || "#00ff41");
+				setAiProvider(provider || "OpenAI");
+				setOpenaiApiKey(oak || "");
+				setAnthropicApiKey(aak || "");
+				setGeminiApiKey(gak || "");
 			} catch (err) {
 				console.error("Failed to load settings:", err);
 			} finally {
@@ -23,7 +42,14 @@ export function SettingsPane() {
 
 	const saveSettings = async () => {
 		try {
-			await invoke("set_izorate_setting", { key: "recording_path", value: recordingPath });
+			await Promise.all([
+				invoke("set_izorate_setting", { key: "recording_path", value: recordingPath }),
+				invoke("set_izorate_setting", { key: "terminal_font_color", value: terminalFontColor }),
+				invoke("set_izorate_setting", { key: "ai_provider", value: aiProvider }),
+				invoke("set_izorate_setting", { key: "openai_api_key", value: openaiApiKey }),
+				invoke("set_izorate_setting", { key: "anthropic_api_key", value: anthropicApiKey }),
+				invoke("set_izorate_setting", { key: "gemini_api_key", value: geminiApiKey }),
+			]);
 			setMessage({ text: "Settings saved successfully!", type: "success" });
 			setTimeout(() => setMessage(null), 3000);
 		} catch (err) {
@@ -36,6 +62,7 @@ export function SettingsPane() {
 		{ id: "Terminal", icon: "💻" },
 		{ id: "Recording", icon: "🎥" },
 		{ id: "Appearance", icon: "🎨" },
+		{ id: "AI Assistant", icon: "⬡" },
 	];
 
 	if (loading) return <div className="p-8 text-[#4a6e4a]">Loading settings...</div>;
@@ -70,6 +97,37 @@ export function SettingsPane() {
 						<p className="text-xs text-[#4a6e4a]">Configure your {activeCategory.toLowerCase()} preferences.</p>
 					</div>
 
+					{activeCategory === "Terminal" && (
+						<div className="space-y-6">
+							<div className="space-y-4">
+								<label className="text-xs font-semibold text-[#888] block">Font Color Preset</label>
+								<div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+									{[
+										{ name: "Digital Green", color: "#00ff41" },
+										{ name: "Cyberpunk Pink", color: "#ff00cc" },
+										{ name: "Classic White", color: "#ffffff" },
+										{ name: "Amber Terminal", color: "#ffb000" },
+										{ name: "Matrix Blue", color: "#008cff" },
+										{ name: "Ghost Gray", color: "#888888" },
+									].map(preset => (
+										<button
+											key={preset.color}
+											onClick={() => setTerminalFontColor(preset.color)}
+											className={`flex items-center gap-2 px-3 py-2 rounded border transition-all ${terminalFontColor.toLowerCase() === preset.color.toLowerCase()
+												? "bg-[#00ff4110] border-[#00ff4150]"
+												: "bg-black/40 border-[#ffffff10] hover:border-[#ffffff30]"
+												}`}
+										>
+											<div className="w-3 h-3 rounded-full shadow-[0_0_8px_rgba(0,0,0,0.5)]" style={{ background: preset.color }} />
+											<span className="text-[10px] text-[#ccc]">{preset.name}</span>
+										</button>
+									))}
+								</div>
+							</div>
+
+						</div>
+					)}
+
 					{activeCategory === "Recording" && (
 						<div className="space-y-6">
 							<div className="space-y-2">
@@ -88,7 +146,70 @@ export function SettingsPane() {
 						</div>
 					)}
 
-					{activeCategory !== "Recording" && (
+					{activeCategory === "AI Assistant" && (
+						<div className="space-y-6">
+							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+								<div className="space-y-2">
+									<label className="text-xs font-semibold text-[#888] block uppercase tracking-tighter">Provider</label>
+									<select
+										value={aiProvider}
+										onChange={(e) => setAiProvider(e.target.value)}
+										className="w-full bg-black border border-[#4a6e4a40] rounded px-3 py-2 text-xs text-[#00ff41] focus:outline-none focus:border-[#00ff41]"
+									>
+										<option value="OpenAI">OpenAI</option>
+										<option value="Anthropic">Anthropic</option>
+										<option value="Google">Google (Gemini)</option>
+									</select>
+								</div>
+							</div>
+
+							<div className="space-y-4 pt-4 border-t border-[#00ff4110]">
+								{/* Provider Specific Keys */}
+								{aiProvider === "OpenAI" && (
+									<div className="space-y-2">
+										<label className="text-xs font-semibold text-[#888] block uppercase tracking-tighter">OpenAI API Key</label>
+										<input
+											type="password"
+											value={openaiApiKey}
+											onChange={(e) => setOpenaiApiKey(e.target.value)}
+											placeholder="sk-..."
+											className="w-full bg-black border border-[#4a6e4a40] rounded px-3 py-2 text-xs text-[#ccc] focus:outline-none focus:border-[#00ff41]"
+										/>
+									</div>
+								)}
+								{aiProvider === "Anthropic" && (
+									<div className="space-y-2">
+										<label className="text-xs font-semibold text-[#888] block uppercase tracking-tighter">Anthropic API Key</label>
+										<input
+											type="password"
+											value={anthropicApiKey}
+											onChange={(e) => setAnthropicApiKey(e.target.value)}
+											placeholder="sk-ant-..."
+											className="w-full bg-black border border-[#4a6e4a40] rounded px-3 py-2 text-xs text-[#ccc] focus:outline-none focus:border-[#00ff41]"
+										/>
+									</div>
+								)}
+								{aiProvider === "Google" && (
+									<div className="space-y-2">
+										<label className="text-xs font-semibold text-[#888] block uppercase tracking-tighter">Google Gemini API Key</label>
+										<input
+											type="password"
+											value={geminiApiKey}
+											onChange={(e) => setGeminiApiKey(e.target.value)}
+											placeholder="AIza..."
+											className="w-full bg-black border border-[#4a6e4a40] rounded px-3 py-2 text-xs text-[#ccc] focus:outline-none focus:border-[#00ff41]"
+										/>
+									</div>
+								)}
+							</div>
+
+							<p className="text-[10px] text-[#4a6e4a] italic">
+								Note: API keys are stored locally. The AI Assistant model is selected directly in the chat panel.
+							</p>
+						</div>
+					)}
+
+					{activeCategory !== "Recording" && activeCategory !== "Terminal" && activeCategory !== "AI Assistant" && (
 						<div className="flex-1 flex flex-col items-center justify-center p-12 border border-dashed border-[#4a6e4a40] rounded text-[#4a6e4a] italic text-center">
 							No settings available for this category yet.
 						</div>

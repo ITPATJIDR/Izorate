@@ -66,6 +66,15 @@ function ThemedSelect({
 	);
 }
 
+interface Credential {
+	id: number;
+	name: string;
+	username: string;
+	password?: string;
+	private_key?: string;
+	passphrase?: string;
+}
+
 export function NewConnectionModal({ onClose, onSaved, editSession }: Props) {
 	const [form, setForm] = useState<ConnectionForm>({
 		name: editSession?.name ?? "",
@@ -77,6 +86,7 @@ export function NewConnectionModal({ onClose, onSaved, editSession }: Props) {
 		group_name: editSession?.group ?? "Default",
 	});
 	const [groups, setGroups] = useState<string[]>(["Default"]);
+	const [credentials, setCredentials] = useState<Credential[]>([]);
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
@@ -87,6 +97,10 @@ export function NewConnectionModal({ onClose, onSaved, editSession }: Props) {
 				setGroups(merged);
 			})
 			.catch(() => setGroups(["Default"]));
+
+		invoke<Credential[]>("get_credentials")
+			.then(data => setCredentials(data))
+			.catch(err => console.error("Failed to fetch credentials:", err));
 	}, []);
 
 	const handleChange = (field: keyof ConnectionForm, value: string | number) => {
@@ -97,6 +111,17 @@ export function NewConnectionModal({ onClose, onSaved, editSession }: Props) {
 			}
 			return updated;
 		});
+	};
+
+	const handleSelectCredential = (id: string) => {
+		const cred = credentials.find(c => String(c.id) === id);
+		if (cred) {
+			setForm(prev => ({
+				...prev,
+				username: cred.username,
+				password: cred.password || prev.password
+			}));
+		}
 	};
 
 	const handleSubmit = async (e: React.FormEvent) => {
@@ -115,8 +140,8 @@ export function NewConnectionModal({ onClose, onSaved, editSession }: Props) {
 					host: form.host,
 					port: form.port,
 					conn_type: form.conn_type,
-					username: form.username,
-					password: form.password || null,
+					username: form.username.trim(),
+					password: form.password.trim() || null,
 					group_name: form.group_name,
 				},
 			};
@@ -141,7 +166,6 @@ export function NewConnectionModal({ onClose, onSaved, editSession }: Props) {
 		<div
 			className="fixed inset-0 z-50 flex items-center justify-center"
 			style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)" }}
-			onClick={e => e.target === e.currentTarget && onClose()}
 		>
 			<div
 				className="w-full max-w-md rounded-lg shadow-2xl"
@@ -211,6 +235,22 @@ export function NewConnectionModal({ onClose, onSaved, editSession }: Props) {
 						</div>
 					</div>
 
+					<div style={{ height: "4px" }} />
+
+					{credentials.length > 0 && (
+						<Field label="Use Saved Credential">
+							<ThemedSelect
+								value=""
+								onChange={handleSelectCredential}
+							>
+								<option value="" disabled>Select a saved key...</option>
+								{credentials.map(c => (
+									<option key={c.id} value={c.id}>{c.name} ({c.username})</option>
+								))}
+							</ThemedSelect>
+						</Field>
+					)}
+
 					<Field label="Username" required>
 						<Input
 							placeholder="root"
@@ -221,7 +261,7 @@ export function NewConnectionModal({ onClose, onSaved, editSession }: Props) {
 
 					<Field label="Password">
 						<Input
-							placeholder={editSession ? "leave blank to keep unchanged" : "leave blank to prompt in terminal"}
+							placeholder={editSession?.password ? "●●●●●●●● (Saved)" : (editSession ? "leave blank to keep unchanged" : "leave blank to prompt in terminal")}
 							value={form.password}
 							onChange={v => handleChange("password", v)}
 							type="password"

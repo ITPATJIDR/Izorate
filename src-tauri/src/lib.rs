@@ -1,11 +1,11 @@
 mod db;
 mod ssh;
 
-use std::sync::Mutex as StdMutex;
+use std::sync::{Arc, Mutex as StdMutex};
 use std::fs;
 use std::path::PathBuf;
 use rusqlite::Connection;
-use tauri::{State, AppHandle, Manager};
+use tauri::{State, AppHandle, Manager, Emitter};
 use db::ConnectionConfig;
 
 struct DbState(StdMutex<Connection>);
@@ -57,6 +57,61 @@ fn update_connection(state: State<DbState>, config: ConnectionConfig) -> Result<
 fn delete_connection(state: State<DbState>, id: i64) -> Result<(), String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?;
     db::delete(&conn, id).map_err(|e| e.to_string())
+}
+
+// Credential Commands
+#[tauri::command]
+fn get_credentials(state: State<DbState>) -> Result<Vec<db::Credential>, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    db::get_credentials(&conn).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn upsert_credential(state: State<DbState>, cred: db::Credential) -> Result<i64, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    db::upsert_credential(&conn, &cred).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn delete_credential(state: State<DbState>, id: i64) -> Result<(), String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    db::delete_credential(&conn, id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn move_connection_group(state: State<DbState>, id: i64, group_name: String) -> Result<(), String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    db::move_to_group(&conn, id, &group_name).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn get_chats(state: State<DbState>) -> Result<Vec<db::Chat>, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    db::get_chats(&conn).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn create_chat(state: State<DbState>, title: String) -> Result<i64, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    db::create_chat(&conn, &title).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn delete_chat(state: State<DbState>, id: i64) -> Result<(), String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    db::delete_chat(&conn, id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn get_messages(state: State<DbState>, chat_id: i64) -> Result<Vec<db::Message>, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    db::get_messages(&conn, chat_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn add_message(state: State<DbState>, chat_id: i64, role: String, content: String) -> Result<i64, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    db::add_message(&conn, chat_id, &role, &content).map_err(|e| e.to_string())
 }
 
 // SSH Commands
@@ -137,6 +192,227 @@ fn save_clipboard_history(app: AppHandle, content: String) -> Result<(), String>
 }
 
 #[tauri::command]
+async fn ping_host(app: AppHandle, state: State<'_, DbState>, host: String, count: u32, source_session_id: i64, password: Option<String>) -> Result<(), String> {
+    if source_session_id == -1 {
+        // Run locally (existing logic)
+        use std::process::Stdio;
+        use tokio::io::{AsyncBufReadExt, BufReader};
+        use tokio::process::Command;
+
+        let mut cmd = Command::new("ping");
+        cmd.arg("-c").arg(count.to_string());
+        let mut child = cmd.arg(&host)
+            .stdout(Stdio::piped())
+            .spawn()
+            .map_err(|e| format!("Failed to start ping: {}", e))?;
+
+        let stdout = child.stdout.take().unwrap();
+        let mut reader = BufReader::new(stdout).lines();
+
+        while let Ok(Some(line)) = reader.next_line().await {
+            app.emit("ping-result", line).map_err(|e| e.to_string())?;
+        }
+        let _ = child.wait().await;
+    } else {
+        // Run remotely via SSH
+        let config = {
+            let conn = state.0.lock().map_err(|e| e.to_string())?;
+            db::get_all(&conn).unwrap().into_iter().find(|c| c.id == Some(source_session_id)).ok_or("Session not found")?
+        };
+        let cmd = format!("ping -c {} {}", count, host);
+        ssh::execute_remote_command(app, source_session_id, config, cmd, "ping-result".into(), password).await?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+async fn traceroute_host(app: AppHandle, state: State<'_, DbState>, host: String, source_session_id: i64, password: Option<String>) -> Result<(), String> {
+    if source_session_id == -1 {
+        // Run locally
+        use std::process::Stdio;
+        use tokio::io::{AsyncBufReadExt, BufReader};
+        use tokio::process::Command;
+
+        let mut cmd = Command::new("traceroute");
+        cmd.arg("-n").arg("-w").arg("1").arg("-q").arg("1");
+        let mut child = cmd.arg(&host)
+            .stdout(Stdio::piped())
+            .spawn()
+            .map_err(|e| format!("Failed to start traceroute: {}", e))?;
+
+        let stdout = child.stdout.take().unwrap();
+        let mut reader = BufReader::new(stdout).lines();
+
+        while let Ok(Some(line)) = reader.next_line().await {
+            app.emit("traceroute-result", line).map_err(|e| e.to_string())?;
+        }
+        let _ = child.wait().await;
+    } else {
+        // Run remotely
+        let config = {
+            let conn = state.0.lock().map_err(|e| e.to_string())?;
+            db::get_all(&conn).unwrap().into_iter().find(|c| c.id == Some(source_session_id)).ok_or("Session not found")?
+        };
+        let cmd = format!("traceroute -n -w 1 -q 1 {}", host);
+        ssh::execute_remote_command(app, source_session_id, config, cmd, "traceroute-result".into(), password).await?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+async fn get_local_ports(_app: AppHandle, state: State<'_, DbState>, source_session_id: i64, password: Option<String>) -> Result<Vec<serde_json::Value>, String> {
+    let stdout = if source_session_id == -1 {
+        use std::process::Command;
+        let output = Command::new("netstat")
+            .arg("-tuln")
+            .output()
+            .map_err(|e| format!("Failed to run netstat: {}", e))?;
+        String::from_utf8_lossy(&output.stdout).to_string()
+    } else {
+        let config = {
+            let conn = state.0.lock().map_err(|e| e.to_string())?;
+            db::get_all(&conn).unwrap().into_iter().find(|c| c.id == Some(source_session_id)).ok_or("Session not found")?
+        };
+        // We need a way to capture the output of execute_remote_command instead of emitting it
+        // Or just implement a simpler one-off exec here
+        let ssh_config = Arc::new(russh::client::Config::default());
+        let host_port = format!("{}:{}", config.host, config.port);
+        let mut session = russh::client::connect(ssh_config, host_port, ssh::DummyHandler).await.map_err(|e| e.to_string())?;
+        let pwd = password.or(config.password).ok_or("Password required")?;
+        session.authenticate_password(config.username, pwd).await.map_err(|e| e.to_string())?;
+        let mut channel = session.channel_open_session().await.map_err(|e| e.to_string())?;
+        channel.exec(true, "netstat -tuln").await.map_err(|e| e.to_string())?;
+        
+        let mut output = String::new();
+        loop {
+            match channel.wait().await {
+                Some(russh::ChannelMsg::Data { ref data }) => output.push_str(&String::from_utf8_lossy(data)),
+                Some(russh::ChannelMsg::Eof) | Some(russh::ChannelMsg::Close) | None => break,
+                _ => {}
+            }
+        }
+        output
+    };
+
+    let mut ports = Vec::new();
+    for line in stdout.lines().skip(2) {
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if parts.len() >= 4 {
+            let proto = parts[0];
+            let local_addr = parts[3];
+            if let Some(port_str) = local_addr.split(':').last() {
+                if let Ok(port) = port_str.parse::<u32>() {
+                    ports.push(serde_json::json!({
+                        "protocol": proto,
+                        "port": port,
+                        "address": local_addr,
+                        "state": parts.get(5).unwrap_or(&"")
+                    }));
+                }
+            }
+        }
+    }
+    Ok(ports)
+}
+
+#[tauri::command]
+async fn check_port_connectivity(host: String, port: u16) -> Result<serde_json::Value, String> {
+    use std::net::{TcpStream, ToSocketAddrs};
+    use std::time::{Duration, Instant};
+
+    let addr_str = format!("{}:{}", host, port);
+    let start = Instant::now();
+    
+    let timeout = Duration::from_secs(2);
+    let addrs = addr_str.to_socket_addrs().map_err(|e| e.to_string())?;
+    
+    let mut last_err = String::from("No addresses found");
+    for addr in addrs {
+        match TcpStream::connect_timeout(&addr, timeout) {
+            Ok(_) => {
+                let duration = start.elapsed();
+                return Ok(serde_json::json!({
+                    "connected": true,
+                    "latency_ms": duration.as_millis() as u64
+                }));
+            }
+            Err(e) => {
+                last_err = e.to_string();
+            }
+        }
+    }
+
+    Ok(serde_json::json!({
+        "connected": false,
+        "error": last_err
+    }))
+}
+
+#[tauri::command]
+async fn list_models(provider: String, api_key: String) -> Result<Vec<String>, String> {
+    let client = reqwest::Client::new();
+    
+    match provider.as_str() {
+        "OpenAI" => {
+            let res = client.get("https://api.openai.com/v1/models")
+                .header("Authorization", format!("Bearer {}", api_key))
+                .send()
+                .await
+                .map_err(|e| e.to_string())?;
+                
+            let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+            let mut models = Vec::new();
+            if let Some(data) = json.get("data").and_then(|d| d.as_array()) {
+                for m in data {
+                    if let Some(id) = m.get("id").and_then(|i| i.as_str()) {
+                        // Filter for common chat models to keep list useful
+                        if id.starts_with("gpt-") || id.contains("o1") {
+                            models.push(id.to_string());
+                        }
+                    }
+                }
+            }
+            models.sort();
+            Ok(models)
+        },
+        "Anthropic" => {
+            // Anthropic doesn't have a public list models API yet.
+            // Returning standard ones.
+            Ok(vec![
+                "claude-3-5-sonnet-20240620".to_string(),
+                "claude-3-opus-20240229".to_string(),
+                "claude-3-haiku-20240307".to_string(),
+                "claude-2.1".to_string(),
+            ])
+        },
+        "Google" => {
+            let url = format!("https://generativelanguage.googleapis.com/v1beta/models?key={}", api_key);
+            let res = client.get(&url)
+                .send()
+                .await
+                .map_err(|e| e.to_string())?;
+                
+            let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+            let mut models = Vec::new();
+            if let Some(data) = json.get("models").and_then(|d| d.as_array()) {
+                for m in data {
+                    if let Some(name) = m.get("name").and_then(|n| n.as_str()) {
+                        // name is like "models/gemini-pro"
+                        let short_name = name.strip_prefix("models/").unwrap_or(name);
+                        if short_name.contains("gemini") {
+                            models.push(short_name.to_string());
+                        }
+                    }
+                }
+            }
+            models.sort();
+            Ok(models)
+        },
+        _ => Err("Unsupported provider for listing models".to_string())
+    }
+}
+
+#[tauri::command]
 async fn save_terminal_video(app: AppHandle, bytes: Vec<u8>, filename: String) -> Result<String, String> {
     let state = app.state::<DbState>();
     let path = {
@@ -176,6 +452,15 @@ pub fn run() {
             add_connection,
             update_connection,
             delete_connection,
+            get_credentials,
+            upsert_credential,
+            delete_credential,
+            move_connection_group,
+            get_chats,
+            create_chat,
+            delete_chat,
+            get_messages,
+            add_message,
             connect_ssh,
             write_pty,
             resize_pty,
@@ -187,7 +472,12 @@ pub fn run() {
             get_izorate_setting,
             set_izorate_setting,
             save_clipboard_history,
-            save_terminal_video
+            save_terminal_video,
+            ping_host,
+            traceroute_host,
+            get_local_ports,
+            check_port_connectivity,
+            list_models
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

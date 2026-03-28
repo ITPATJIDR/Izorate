@@ -35,7 +35,7 @@ pub enum SshCmd {
     Close,
 }
 
-struct DummyHandler;
+pub struct DummyHandler;
 
 impl client::Handler for DummyHandler {
     type Error = russh::Error;
@@ -270,5 +270,58 @@ pub async fn download_file(state: tauri::State<'_, SshManager>, id: i64, remote_
     
     tokio::fs::write(&local_path, data).await.map_err(|e| e.to_string())?;
     
+    Ok(())
+}
+pub async fn execute_remote_command(
+    app: AppHandle,
+    _id: i64,
+    config: ConnectionConfig,
+    cmd_str: String,
+    event_name: String,
+    manual_password: Option<String>
+) -> Result<(), String> {
+    let ssh_config = Arc::new(client::Config::default());
+    let host_port = format!("{}:{}", config.host, config.port);
+    
+    // Connect to server
+    let mut session = client::connect(ssh_config, host_port, DummyHandler).await
+        .map_err(|e| format!("Connect error: {}", e))?;
+
+    // Authenticate
+    let pwd = manual_password.or(config.password).ok_or("Password required")?;
+    let auth_status = session.authenticate_password(config.username, pwd).await
+        .map_err(|e| format!("Auth error: {}", e))?;
+
+    if !matches!(auth_status, russh::client::AuthResult::Success) {
+        return Err("Authentication failed".into());
+    }
+
+    // Open channel for execution (non-interactive)
+    let mut channel = session.channel_open_session().await.map_err(|e| e.to_string())?;
+    channel.exec(true, cmd_str).await.map_err(|e| e.to_string())?;
+
+    // Stream output
+    loop {
+        match channel.wait().await {
+            Some(ChannelMsg::Data { ref data }) => {
+                let text = String::from_utf8_lossy(data).to_string();
+                // Split by line to emit line-by-line if needed, or just emit as is
+                for line in text.lines() {
+                    let _ = app.emit(&event_name, line);
+                }
+            }
+            Some(ChannelMsg::ExtendedData { ref data, .. }) => {
+                let text = String::from_utf8_lossy(data).to_string();
+                for line in text.lines() {
+                    let _ = app.emit(&event_name, line);
+                }
+            }
+            Some(ChannelMsg::Eof) | Some(ChannelMsg::Close) | None => {
+                break;
+            }
+            _ => {}
+        }
+    }
+
     Ok(())
 }

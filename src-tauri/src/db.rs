@@ -13,6 +13,32 @@ pub struct ConnectionConfig {
     pub group_name: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Credential {
+    pub id: Option<i64>,
+    pub name: String,
+    pub username: String,
+    pub password: Option<String>,
+    pub private_key: Option<String>,
+    pub passphrase: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Chat {
+    pub id: Option<i64>,
+    pub title: String,
+    pub created_at: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Message {
+    pub id: Option<i64>,
+    pub chat_id: i64,
+    pub role: String,
+    pub content: String,
+    pub timestamp: String,
+}
+
 pub fn init_db(conn: &Connection) -> Result<()> {
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS groups (
@@ -31,6 +57,14 @@ pub fn init_db(conn: &Connection) -> Result<()> {
             password   TEXT,
             group_name TEXT NOT NULL DEFAULT 'Default'
         );
+        CREATE TABLE IF NOT EXISTS credentials (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            name        TEXT NOT NULL UNIQUE,
+            username    TEXT NOT NULL,
+            password    TEXT,
+            private_key TEXT,
+            passphrase  TEXT
+        );
         CREATE TABLE IF NOT EXISTS settings (
             key   TEXT PRIMARY KEY,
             value TEXT NOT NULL
@@ -39,6 +73,19 @@ pub fn init_db(conn: &Connection) -> Result<()> {
             id        INTEGER PRIMARY KEY AUTOINCREMENT,
             content   TEXT NOT NULL,
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS chats (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            title      TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS messages (
+            id        INTEGER PRIMARY KEY AUTOINCREMENT,
+            chat_id   INTEGER NOT NULL,
+            role      TEXT NOT NULL,
+            content   TEXT NOT NULL,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(chat_id) REFERENCES chats(id) ON DELETE CASCADE
         );",
     )
 }
@@ -116,6 +163,12 @@ pub fn delete(conn: &Connection, id: i64) -> Result<()> {
     Ok(())
 }
 
+pub fn move_to_group(conn: &Connection, id: i64, group_name: &str) -> Result<()> {
+    ensure_group(conn, group_name)?;
+    conn.execute("UPDATE connections SET group_name=?1 WHERE id=?2", params![group_name, id])?;
+    Ok(())
+}
+
 pub fn get_setting(conn: &Connection, key: &str) -> Result<Option<String>> {
     let mut stmt = conn.prepare("SELECT value FROM settings WHERE key = ?1")?;
     let mut rows = stmt.query_map(params![key], |row| row.get(0))?;
@@ -141,4 +194,86 @@ pub fn add_clipboard_history(conn: &Connection, content: &str) -> Result<()> {
         params![content],
     )?;
     Ok(())
+}
+
+// Credential CRUD
+pub fn get_credentials(conn: &Connection) -> Result<Vec<Credential>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, name, username, password, private_key, passphrase FROM credentials ORDER BY name"
+    )?;
+    let rows = stmt.query_map([], |row| {
+        Ok(Credential {
+            id: Some(row.get(0)?),
+            name: row.get(1)?,
+            username: row.get(2)?,
+            password: row.get(3)?,
+            private_key: row.get(4)?,
+            passphrase: row.get(5)?,
+        })
+    })?;
+    rows.collect()
+}
+
+pub fn upsert_credential(conn: &Connection, cred: &Credential) -> Result<i64> {
+    if let Some(id) = cred.id {
+        conn.execute(
+            "UPDATE credentials SET name=?1, username=?2, password=?3, private_key=?4, passphrase=?5 WHERE id=?6",
+            params![cred.name, cred.username, cred.password, cred.private_key, cred.passphrase, id],
+        )?;
+        Ok(id)
+    } else {
+        conn.execute(
+            "INSERT INTO credentials (name, username, password, private_key, passphrase) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![cred.name, cred.username, cred.password, cred.private_key, cred.passphrase],
+        )?;
+        Ok(conn.last_insert_rowid())
+    }
+}
+
+pub fn delete_credential(conn: &Connection, id: i64) -> Result<()> {
+    conn.execute("DELETE FROM credentials WHERE id=?1", params![id])?;
+    Ok(())
+}
+
+// AI Chat CRUD
+pub fn get_chats(conn: &Connection) -> Result<Vec<Chat>> {
+    let mut stmt = conn.prepare("SELECT id, title, created_at FROM chats ORDER BY created_at DESC")?;
+    let rows = stmt.query_map([], |row| {
+        Ok(Chat {
+            id: Some(row.get(0)?),
+            title: row.get(1)?,
+            created_at: row.get(2)?,
+        })
+    })?;
+    rows.collect()
+}
+
+pub fn create_chat(conn: &Connection, title: &str) -> Result<i64> {
+    conn.execute("INSERT INTO chats (title) VALUES (?1)", params![title])?;
+    Ok(conn.last_insert_rowid())
+}
+
+pub fn delete_chat(conn: &Connection, id: i64) -> Result<()> {
+    conn.execute("DELETE FROM messages WHERE chat_id=?1", params![id])?; // Optional cleanup
+    conn.execute("DELETE FROM chats WHERE id=?1", params![id])?;
+    Ok(())
+}
+
+pub fn get_messages(conn: &Connection, chat_id: i64) -> Result<Vec<Message>> {
+    let mut stmt = conn.prepare("SELECT id, chat_id, role, content, timestamp FROM messages WHERE chat_id=?1 ORDER BY timestamp ASC")?;
+    let rows = stmt.query_map(params![chat_id], |row| {
+        Ok(Message {
+            id: Some(row.get(0)?),
+            chat_id: row.get(1)?,
+            role: row.get(2)?,
+            content: row.get(3)?,
+            timestamp: row.get(4)?,
+        })
+    })?;
+    rows.collect()
+}
+
+pub fn add_message(conn: &Connection, chat_id: i64, role: &str, content: &str) -> Result<i64> {
+    conn.execute("INSERT INTO messages (chat_id, role, content) VALUES (?1, ?2, ?3)", params![chat_id, role, content])?;
+    Ok(conn.last_insert_rowid())
 }
