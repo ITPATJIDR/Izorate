@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, memo, useMemo, useCallback } from "react";
+import { useState, useEffect, useRef, memo, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -21,8 +21,8 @@ const CopyButton = ({ code }: { code: string }) => {
 		<button
 			onClick={handleCopy}
 			className={`text-[9px] px-2 py-1 rounded border transition-all uppercase font-bold backdrop-blur-sm ${copied
-					? "bg-[#00ff4140] text-[#00ff41] border-[#00ff41]"
-					: "bg-[#00ff4110] hover:bg-[#00ff4130] text-[#00ff4180] hover:text-[#00ff41] border-[#00ff4120]"
+				? "bg-[#00ff4140] text-[#00ff41] border-[#00ff41]"
+				: "bg-[#00ff4110] hover:bg-[#00ff4130] text-[#00ff4180] hover:text-[#00ff41] border-[#00ff4120]"
 				}`}
 		>
 			{copied ? "Copied!" : "Copy"}
