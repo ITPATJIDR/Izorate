@@ -194,17 +194,23 @@ fn save_clipboard_history(app: AppHandle, content: String) -> Result<(), String>
 #[tauri::command]
 async fn ping_host(app: AppHandle, state: State<'_, DbState>, host: String, count: u32, source_session_id: i64, password: Option<String>) -> Result<(), String> {
     if source_session_id == -1 {
-        // Run locally (existing logic)
+        // Run locally
         use std::process::Stdio;
         use tokio::io::{AsyncBufReadExt, BufReader};
         use tokio::process::Command;
 
         let mut cmd = Command::new("ping");
-        cmd.arg("-c").arg(count.to_string());
+        #[cfg(windows)] {
+            cmd.arg("-n").arg(count.to_string());
+        }
+        #[cfg(not(windows))] {
+            cmd.arg("-c").arg(count.to_string());
+        }
+
         let mut child = cmd.arg(&host)
             .stdout(Stdio::piped())
             .spawn()
-            .map_err(|e| format!("Failed to start ping: {}", e))?;
+            .map_err(|e| format!("Failed to start ping: {}. Is 'ping' installed and in your PATH?", e))?;
 
         let stdout = child.stdout.take().unwrap();
         let mut reader = BufReader::new(stdout).lines();
@@ -214,7 +220,7 @@ async fn ping_host(app: AppHandle, state: State<'_, DbState>, host: String, coun
         }
         let _ = child.wait().await;
     } else {
-        // Run remotely via SSH
+        // Run remotely via SSH (Assume Linux/Unix remote)
         let config = {
             let conn = state.0.lock().map_err(|e| e.to_string())?;
             db::get_all(&conn).unwrap().into_iter().find(|c| c.id == Some(source_session_id)).ok_or("Session not found")?
@@ -233,12 +239,25 @@ async fn traceroute_host(app: AppHandle, state: State<'_, DbState>, host: String
         use tokio::io::{AsyncBufReadExt, BufReader};
         use tokio::process::Command;
 
+        #[cfg(windows)]
+        let mut cmd = Command::new("tracert");
+        #[cfg(not(windows))]
         let mut cmd = Command::new("traceroute");
-        cmd.arg("-n").arg("-w").arg("1").arg("-q").arg("1");
+
+        #[cfg(windows)] {
+            cmd.arg("-d"); // No hostname resolution
+        }
+        #[cfg(not(windows))] {
+            cmd.arg("-n").arg("-w").arg("1").arg("-q").arg("1");
+        }
+
         let mut child = cmd.arg(&host)
             .stdout(Stdio::piped())
             .spawn()
-            .map_err(|e| format!("Failed to start traceroute: {}", e))?;
+            .map_err(|e| {
+                let bin = if cfg!(windows) { "tracert" } else { "traceroute" };
+                format!("Failed to start {}: {}. Please ensure it is installed and in your PATH.", bin, e)
+            })?;
 
         let stdout = child.stdout.take().unwrap();
         let mut reader = BufReader::new(stdout).lines();
@@ -248,7 +267,7 @@ async fn traceroute_host(app: AppHandle, state: State<'_, DbState>, host: String
         }
         let _ = child.wait().await;
     } else {
-        // Run remotely
+        // Run remotely (Assume Linux/Unix remote)
         let config = {
             let conn = state.0.lock().map_err(|e| e.to_string())?;
             db::get_all(&conn).unwrap().into_iter().find(|c| c.id == Some(source_session_id)).ok_or("Session not found")?
@@ -263,19 +282,18 @@ async fn traceroute_host(app: AppHandle, state: State<'_, DbState>, host: String
 async fn get_local_ports(_app: AppHandle, state: State<'_, DbState>, source_session_id: i64, password: Option<String>) -> Result<Vec<serde_json::Value>, String> {
     let stdout = if source_session_id == -1 {
         use std::process::Command;
-        let output = Command::new("netstat")
-            .arg("-tuln")
-            .output()
-            .map_err(|e| format!("Failed to run netstat: {}", e))?;
+        let mut cmd = Command::new("netstat");
+        #[cfg(windows)] { cmd.arg("-ano"); }
+        #[cfg(not(windows))] { cmd.arg("-tuln"); }
+
+        let output = cmd.output().map_err(|e| format!("Failed to run netstat: {}. Is it installed?", e))?;
         String::from_utf8_lossy(&output.stdout).to_string()
     } else {
         let config = {
             let conn = state.0.lock().map_err(|e| e.to_string())?;
             db::get_all(&conn).unwrap().into_iter().find(|c| c.id == Some(source_session_id)).ok_or("Session not found")?
         };
-        // We need a way to capture the output of execute_remote_command instead of emitting it
-        // Or just implement a simpler one-off exec here
-        let ssh_config = Arc::new(russh::client::Config::default());
+        let ssh_config = std::sync::Arc::new(russh::client::Config::default());
         let host_port = format!("{}:{}", config.host, config.port);
         let mut session = russh::client::connect(ssh_config, host_port, ssh::DummyHandler).await.map_err(|e| e.to_string())?;
         let pwd = password.or(config.password).ok_or("Password required")?;
@@ -295,18 +313,24 @@ async fn get_local_ports(_app: AppHandle, state: State<'_, DbState>, source_sess
     };
 
     let mut ports = Vec::new();
-    for line in stdout.lines().skip(2) {
+    for line in stdout.lines() {
         let parts: Vec<&str> = line.split_whitespace().collect();
         if parts.len() >= 4 {
-            let proto = parts[0];
-            let local_addr = parts[3];
-            if let Some(port_str) = local_addr.split(':').last() {
+            let proto = parts[0].to_uppercase();
+            if proto != "TCP" && proto != "UDP" { continue; }
+            
+            let local_addr = if cfg!(windows) {
+                parts.get(1).copied().unwrap_or("")
+            } else {
+                parts.get(3).copied().unwrap_or("")
+            };
+
+            if let Some(port_str) = local_addr.split(':').last().or_else(|| local_addr.split('.').last()) {
                 if let Ok(port) = port_str.parse::<u32>() {
                     ports.push(serde_json::json!({
                         "protocol": proto,
                         "port": port,
-                        "address": local_addr,
-                        "state": parts.get(5).unwrap_or(&"")
+                        "address": local_addr
                     }));
                 }
             }
