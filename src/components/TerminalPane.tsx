@@ -59,6 +59,21 @@ export function TerminalPane({ session }: Props) {
 
 		xtermRef.current = term;
 
+		// Handle Ctrl + ] for AI context
+		term.attachCustomKeyEventHandler((e) => {
+			if (e.ctrlKey && (e.key === "]" || e.keyCode === 221) && e.type === "keydown") {
+				const selection = term.getSelection();
+				if (selection) {
+					invoke("emit_terminal_selection", {
+						text: selection,
+						sessionName: session.name
+					}).catch(console.error);
+				}
+				return false; // Prevent default
+			}
+			return true;
+		});
+
 		term.writeln(`\x1b[32m[Izorate] Connecting to ${session.username}@${session.host}...\x1b[0m`);
 
 		let unlistenOut: (() => void) | undefined;
@@ -265,6 +280,21 @@ export function TerminalPane({ session }: Props) {
 					</span>
 				</div>
 				<div className="flex items-center gap-2">
+					<button
+						onClick={() => isRecording ? stopRecording() : startRecording()}
+						className="px-3 py-1 text-xs font-semibold rounded transition-colors"
+						style={{
+							color: isRecording ? "#ff3e3e" : fontColor,
+							border: `1px solid ${isRecording ? "#ff3e3e40" : fontColor + "40"}`,
+							background: isRecording ? "#ff3e3e10" : "transparent"
+						}}
+						onMouseEnter={(e) => e.currentTarget.style.background = isRecording ? "#ff3e3e20" : `${fontColor}20`}
+						onMouseLeave={(e) => e.currentTarget.style.background = isRecording ? "#ff3e3e10" : "transparent"}
+						title={isRecording ? "Stop Recording" : "Record Terminal"}
+					>
+						{isRecording ? "Stop" : "Record"}
+					</button>
+
 					<button
 						onClick={() => setRefreshKey(prev => prev + 1)}
 						className="px-3 py-1 text-xs font-semibold rounded transition-colors"

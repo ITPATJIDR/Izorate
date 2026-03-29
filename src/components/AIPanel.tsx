@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, memo, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
@@ -93,7 +94,17 @@ export const AIPanel = memo(({ width = 280, activeChatId, onToggleCollapse }: AI
 	const [currentProvider, setCurrentProvider] = useState("OpenAI");
 	const [availableModels, setAvailableModels] = useState<string[]>([]);
 	const [loadingModels, setLoadingModels] = useState(false);
+	const [contexts, setContexts] = useState<{ id: string, text: string, sessionName: string }[]>([]);
 	const scrollRef = useRef<HTMLDivElement>(null);
+	const inputRef = useRef<HTMLTextAreaElement>(null);
+
+	// Auto-resize textarea
+	useEffect(() => {
+		if (inputRef.current) {
+			inputRef.current.style.height = 'auto';
+			inputRef.current.style.height = `${Math.min(inputRef.current.scrollHeight, 150)}px`;
+		}
+	}, [question]);
 
 	const checkAiStatus = useCallback(async () => {
 		try {
@@ -131,6 +142,26 @@ export const AIPanel = memo(({ width = 280, activeChatId, onToggleCollapse }: AI
 		checkAiStatus();
 	}, [activeChatId, checkAiStatus]);
 
+	useEffect(() => {
+		const unlisten = listen<{ text: string, sessionName: string }>("terminal-selection-to-ai", (event) => {
+			const { text, sessionName } = event.payload;
+
+			setContexts(prev => [
+				...prev,
+				{ id: crypto.randomUUID(), text, sessionName }
+			]);
+
+			// Open AI Panel if it's collapsed
+			if (width <= 0 && onToggleCollapse) {
+				onToggleCollapse();
+			}
+		});
+
+		return () => {
+			unlisten.then(f => f());
+		};
+	}, [width, onToggleCollapse]);
+
 	const handleModelChange = async (newModel: string) => {
 		try {
 			await invoke("set_izorate_setting", { key: "ai_model", value: newModel });
@@ -158,11 +189,28 @@ export const AIPanel = memo(({ width = 280, activeChatId, onToggleCollapse }: AI
 		}
 	}, [messages]);
 
-	const handleSend = async () => {
-		if (!question.trim() || !activeChatId || isGenerating) return;
+	const removeContext = (id: string) => {
+		setContexts(prev => prev.filter(c => c.id !== id));
+	};
 
-		const userMsg = question.trim();
+	const handleSend = async () => {
+		if ((!question.trim() && contexts.length === 0) || !activeChatId || isGenerating) return;
+
+		let userMsg = question.trim();
+
+		// Append context if available
+		if (contexts.length > 0) {
+			const contextBlock = contexts.map(c =>
+				`Context from [${c.sessionName}]:\n\`\`\`\n${c.text}\n\`\`\``
+			).join("\n\n");
+
+			userMsg = userMsg
+				? `${userMsg}\n\n---\n${contextBlock}`
+				: `Please analyze this terminal context:\n\n${contextBlock}`;
+		}
+
 		setQuestion("");
+		setContexts([]);
 		setIsGenerating(true);
 
 		try {
@@ -293,6 +341,25 @@ export const AIPanel = memo(({ width = 280, activeChatId, onToggleCollapse }: AI
 							</div>
 						) : (
 							<div className="flex flex-col gap-2">
+								<div className="flex flex-wrap gap-1.5 min-h-[5px]">
+									{contexts.map(ctx => (
+										<div
+											key={ctx.id}
+											className="flex items-center gap-1.5 px-2 py-0.5 rounded border border-[#00ff4140] bg-[#00ff4108] text-[#00ff41] text-[9px] uppercase font-bold tracking-tight crt-glow group"
+										>
+											<span className="opacity-60 text-[7px] text-[#4a6e4a]">Terminal:</span>
+											<span>{ctx.sessionName}</span>
+											<button
+												onClick={() => removeContext(ctx.id)}
+												className="ml-1 text-[#4a6e4a] hover:text-red-400 transition-colors"
+												title="Remove Context"
+											>
+												✕
+											</button>
+										</div>
+									))}
+								</div>
+
 								<div className="flex items-center justify-between px-1">
 									<div className="flex items-center gap-1.5">
 										<span className="text-[8px] text-[#4a6e4a] uppercase font-bold tracking-tighter">Model:</span>
@@ -316,20 +383,26 @@ export const AIPanel = memo(({ width = 280, activeChatId, onToggleCollapse }: AI
 									<span className="text-[8px] text-[#4a6e4a] uppercase font-bold">{currentProvider}</span>
 								</div>
 
-								<div className="flex items-center gap-2 p-2 rounded" style={{ background: "#0f1a0f", border: "1px solid #00ff4130" }}>
-									<input
+								<div className="flex items-start gap-2 p-2 rounded" style={{ background: "#0f1a0f", border: "1px solid #00ff4130" }}>
+									<textarea
+										ref={inputRef}
 										value={question}
 										onChange={e => setQuestion(e.target.value)}
-										onKeyDown={e => e.key === "Enter" && handleSend()}
+										onKeyDown={e => {
+											if (e.key === "Enter" && !e.shiftKey) {
+												e.preventDefault();
+												handleSend();
+											}
+										}}
 										disabled={isGenerating}
-										className="flex-1 bg-transparent outline-none text-xs placeholder-emerald-900 disabled:opacity-30"
-										style={{ color: "#00ff41", fontFamily: "inherit" }}
-										placeholder={isGenerating ? "AI is thinking..." : "ask AI anything..."}
+										className="flex-1 bg-transparent outline-none text-xs placeholder-emerald-900 disabled:opacity-30 resize-none custom-scrollbar"
+										style={{ color: "#00ff41", fontFamily: "inherit", minHeight: "20px", height: "auto", overflowY: "auto" }}
+										placeholder={isGenerating ? "AI is thinking..." : "ask AI anything... (Shift+Enter for newline)"}
 									/>
 									<button
-										disabled={isGenerating || !question.trim()}
+										disabled={isGenerating || (!question.trim() && contexts.length === 0)}
 										onClick={handleSend}
-										className="text-xs transition-colors hover:text-green-300 disabled:opacity-20"
+										className="mt-0.5 text-xs transition-colors hover:text-green-300 disabled:opacity-20 flex-shrink-0"
 										style={{ color: "#00ff41" }}
 									>
 										⏎

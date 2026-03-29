@@ -185,6 +185,14 @@ fn set_izorate_setting(app: AppHandle, key: String, value: String) -> Result<(),
 }
 
 #[tauri::command]
+fn emit_terminal_selection(app: AppHandle, text: String, session_name: String) -> Result<(), String> {
+    app.emit("terminal-selection-to-ai", serde_json::json!({
+        "text": text,
+        "sessionName": session_name
+    })).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 fn save_clipboard_history(app: AppHandle, content: String) -> Result<(), String> {
     let state = app.state::<DbState>();
     let conn = state.0.lock().map_err(|e| e.to_string())?;
@@ -497,6 +505,7 @@ pub fn run() {
             set_izorate_setting,
             save_clipboard_history,
             save_terminal_video,
+            emit_terminal_selection,
             ping_host,
             traceroute_host,
             get_local_ports,
