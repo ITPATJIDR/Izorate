@@ -56,7 +56,7 @@ export function AIPage({ activeChatId, onSelectChat }: AIPageProps) {
 			<div className="flex justify-between items-center mb-6">
 				<div>
 					<h1 className="text-2xl font-bold tracking-tighter crt-glow" style={{ color: "var(--accent-primary)" }}>AI ASSISTANT</h1>
-					<p className="text-xs mt-1" style={{ color: "#4a8a4a" }}>Manage your persistent conversations and insights.</p>
+					<p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>Manage your persistent conversations and insights.</p>
 				</div>
 				<button
 					onClick={handleNewChat}
@@ -81,14 +81,14 @@ export function AIPage({ activeChatId, onSelectChat }: AIPageProps) {
 							<div
 								key={chat.id}
 								onClick={() => onSelectChat(chat.id!)}
-								className={`p-4 border cursor-pointer transition-all hover:translate-y-[-2px] ${activeChatId === chat.id ? 'bg-[var(--bg-hover)]' : 'bg-black/20'}`}
+								className={`p-4 border cursor-pointer transition-all hover:translate-y-[-2px] ${activeChatId === chat.id ? 'bg-[var(--bg-hover)]' : 'bg-[var(--bg-base)]/20'}`}
 								style={{
 									borderColor: activeChatId === chat.id ? "var(--accent-primary)60" : "var(--accent-primary)15",
 									boxShadow: activeChatId === chat.id ? "0 0 15px var(--accent-primary)10" : "none"
 								}}
 							>
 								<div className="flex justify-between items-start mb-2">
-									<h3 className="text-sm font-bold truncate pr-4" style={{ color: activeChatId === chat.id ? "var(--accent-primary)" : "#a0d4a0" }}>
+									<h3 className="text-sm font-bold truncate pr-4" style={{ color: activeChatId === chat.id ? "var(--accent-primary)" : "var(--text-main)" }}>
 										{chat.title}
 									</h3>
 									<button

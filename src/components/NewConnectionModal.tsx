@@ -46,11 +46,11 @@ function ThemedSelect({
 			<select
 				value={value}
 				onChange={e => onChange(e.target.value)}
-				className="w-full appearance-none text-xs px-2 py-1.5 rounded outline-none cursor-pointer"
+				className="w-full appearance-none text-xs px-3 py-2 rounded outline-none cursor-pointer border transition-all focus:border-[var(--accent-primary)]"
 				style={{
-					background: "#0f1a0f",
-					border: "1px solid var(--accent-primary)30",
-					color: "var(--accent-primary)",
+					background: "var(--bg-base)",
+					borderColor: "var(--border-focus)",
+					color: "var(--text-main)",
 					fontFamily: "inherit",
 				}}
 			>
@@ -169,7 +169,7 @@ export function NewConnectionModal({ onClose, onSaved, editSession }: Props) {
 		>
 			<div
 				className="w-full max-w-md rounded-lg shadow-2xl"
-				style={{ background: "#0d0d0d", border: "1px solid var(--accent-primary)30" }}
+				style={{ background: "var(--bg-surface)", border: "1px solid var(--accent-primary)30" }}
 			>
 				<div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: "var(--border-focus)" }}>
 					<span className="text-sm font-semibold crt-glow" style={{ color: "var(--accent-primary)" }}>
@@ -196,7 +196,7 @@ export function NewConnectionModal({ onClose, onSaved, editSession }: Props) {
 									style={
 										form.conn_type === opt.value
 											? { background: "#0f2a0f", border: "1px solid var(--accent-primary)50", color: "var(--accent-primary)" }
-											: { background: "#0a0a0a", border: "1px solid var(--accent-primary)15", color: "#2a4a2a" }
+											: { background: "var(--bg-base)", border: "1px solid var(--accent-primary)15", color: "#2a4a2a" }
 									}
 								>
 									{opt.icon} {opt.label}
@@ -312,8 +312,8 @@ export function NewConnectionModal({ onClose, onSaved, editSession }: Props) {
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
 	return (
 		<div className="flex flex-col gap-1">
-			<label className="text-xs" style={{ color: "#4a8a4a" }}>
-				{label}{required && <span style={{ color: "#ff6b6b" }}> *</span>}
+			<label className="text-[10px] font-bold uppercase" style={{ color: "var(--text-muted)" }}>
+				{label}{required && <span style={{ color: "var(--red)" }}> *</span>}
 			</label>
 			{children}
 		</div>
@@ -334,8 +334,8 @@ function Input({
 			placeholder={placeholder}
 			value={value}
 			onChange={e => onChange(e.target.value)}
-			className="w-full text-xs px-2 py-1.5 rounded outline-none placeholder-emerald-900"
-			style={{ background: "#0f1a0f", border: "1px solid var(--accent-primary)30", color: "var(--accent-primary)" }}
+			className="w-full text-xs px-3 py-2 rounded outline-none placeholder-emerald-900 border transition-all focus:border-[var(--accent-primary)]"
+			style={{ background: "var(--bg-base)", borderColor: "var(--border-focus)", color: "var(--text-main)" }}
 		/>
 	);
 }

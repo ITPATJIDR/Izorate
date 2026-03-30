@@ -54,7 +54,7 @@ const MarkdownRenderer = memo(({ content }: { content: string }) => {
 										margin: 0,
 										padding: "1rem",
 										fontSize: "11px",
-										background: "#050505",
+										background: "var(--bg-card)",
 										border: "1px solid var(--accent-primary)15",
 										borderRadius: "4px"
 									}}
@@ -257,9 +257,9 @@ export const AIPanel = memo(({ width = 280, activeChatId, onToggleCollapse }: AI
 	if (width <= 0) return null;
 
 	return (
-		<div className="flex flex-col h-full shrink-0" style={{ width: `${width}px`, background: "#0a0a0a", borderLeft: "1px solid var(--accent-primary)15" }}>
+		<div className="flex flex-col h-full shrink-0" style={{ width: `${width}px`, background: "var(--bg-base)", borderLeft: "1px solid var(--border-focus)" }}>
 			{/* Header */}
-			<div className="px-3 py-2 border-b flex items-center gap-2" style={{ borderColor: "var(--border-focus)", background: "#0d0d0d" }}>
+			<div className="px-3 py-2 border-b flex items-center gap-2" style={{ borderColor: "var(--border-focus)", background: "var(--bg-surface)" }}>
 				<button
 					onClick={onToggleCollapse}
 					className="text-[var(--text-muted)] hover:text-[var(--accent-primary)] transition-colors p-0.5"
@@ -277,7 +277,7 @@ export const AIPanel = memo(({ width = 280, activeChatId, onToggleCollapse }: AI
 						) : (
 							<>
 								<div className="w-1.5 h-1.5 rounded-full bg-cyan-400 pulse-dot" />
-								<span className="text-[10px]" style={{ color: "#00e5ff" }}>Thinking...</span>
+								<span className="text-[10px]" style={{ color: "var(--cyan)" }}>Thinking...</span>
 							</>
 						)}
 					</div>
@@ -302,10 +302,7 @@ export const AIPanel = memo(({ width = 280, activeChatId, onToggleCollapse }: AI
 							messages.map((msg, i) => (
 								<div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
 									<div className="max-w-[90%] text-xs p-2 rounded leading-relaxed border"
-										style={msg.role === "ai"
-											? { background: "#0f1a0f", borderColor: "var(--accent-primary)25", color: "#a0d4a0" }
-											: { background: "#0a1a2a", borderColor: "#00e5ff25", color: "#a0d8e8" }
-										}>
+										style={{ background: "var(--bg-surface)", borderColor: "var(--border-focus)", color: "var(--text-main)" }}>
 										<div className="flex justify-between items-center mb-1 opacity-40">
 											<span className="text-[9px] uppercase font-bold tracking-widest">
 												{msg.role === "ai" ? "Assistant" : "User"}
@@ -383,7 +380,7 @@ export const AIPanel = memo(({ width = 280, activeChatId, onToggleCollapse }: AI
 									<span className="text-[8px] text-[var(--text-muted)] uppercase font-bold">{currentProvider}</span>
 								</div>
 
-								<div className="flex items-start gap-2 p-2 rounded" style={{ background: "#0f1a0f", border: "1px solid var(--accent-primary)30" }}>
+								<div className="flex items-start gap-2 p-2 rounded" style={{ background: "var(--bg-surface)", border: "1px solid var(--border-focus)" }}>
 									<textarea
 										ref={inputRef}
 										value={question}

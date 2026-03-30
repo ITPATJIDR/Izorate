@@ -108,7 +108,7 @@ export function FileManagerPane({ session }: Props) {
 	return (
 		<div className="flex-1 flex flex-col bg-[var(--bg-base)] text-xs relative overflow-hidden min-h-0">
 			{/* Toolbar / Breadcrumbs */}
-			<div className="flex items-center gap-2 px-4 py-2 border-b" style={{ borderColor: "var(--border-focus)", background: "#0d0d0d" }}>
+			<div className="flex items-center gap-2 px-4 py-2 border-b" style={{ borderColor: "var(--border-focus)", background: "var(--bg-surface)" }}>
 				<button
 					onClick={goUp}
 					disabled={currentPath === '/'}
@@ -143,9 +143,9 @@ export function FileManagerPane({ session }: Props) {
 				<table className="w-full text-left border-collapse">
 					<thead className="sticky top-0 bg-[var(--bg-base)] z-10 shadow-sm shadow-[#0a0a0a]">
 						<tr>
-							<th className="p-2 font-semibold border-b" style={{ borderColor: "var(--border-focus)", color: "#4a8a4a" }}>Name</th>
-							<th className="p-2 font-semibold border-b w-24" style={{ borderColor: "var(--border-focus)", color: "#4a8a4a" }}>Size</th>
-							<th className="p-2 font-semibold border-b w-32" style={{ borderColor: "var(--border-focus)", color: "#4a8a4a" }}>Modified</th>
+							<th className="p-2 font-semibold border-b" style={{ borderColor: "var(--border-focus)", color: "var(--text-muted)" }}>Name</th>
+							<th className="p-2 font-semibold border-b w-24" style={{ borderColor: "var(--border-focus)", color: "var(--text-muted)" }}>Size</th>
+							<th className="p-2 font-semibold border-b w-32" style={{ borderColor: "var(--border-focus)", color: "var(--text-muted)" }}>Modified</th>
 						</tr>
 					</thead>
 					<tbody style={{ opacity: loading ? 0.5 : 1 }}>
@@ -155,14 +155,14 @@ export function FileManagerPane({ session }: Props) {
 								className="hover:bg-[var(--bg-hover)] transition-colors cursor-pointer group"
 								onDoubleClick={() => handleDoubleClick(f)}
 							>
-								<td className="p-2 border-b flex items-center gap-2" style={{ borderColor: "var(--bg-hover)", color: f.is_dir ? "#00e5ff" : "var(--text-main)" }}>
+								<td className="p-2 border-b flex items-center gap-2" style={{ borderColor: "var(--bg-card)", color: f.is_dir ? "var(--cyan)" : "var(--text-main)" }}>
 									<span>{f.is_dir ? "📁" : "📄"}</span>
 									{f.name}
 								</td>
-								<td className="p-2 border-b" style={{ borderColor: "var(--bg-hover)", color: "var(--text-muted)" }}>
+								<td className="p-2 border-b" style={{ borderColor: "var(--bg-card)", color: "var(--text-muted)" }}>
 									{f.is_dir ? "--" : formatBytes(f.size)}
 								</td>
-								<td className="p-2 border-b" style={{ borderColor: "var(--bg-hover)", color: "var(--text-muted)" }}>
+								<td className="p-2 border-b" style={{ borderColor: "var(--bg-card)", color: "var(--text-muted)" }}>
 									{new Date(f.modified * 1000).toLocaleString()}
 								</td>
 							</tr>

@@ -220,7 +220,7 @@ export function ToolsPane({ sessions }: Props) {
 											value={destination}
 											onChange={(e) => setDestination(e.target.value)}
 											placeholder="google.com or 8.8.8.8"
-											className="flex-1 bg-black border border-[var(--border-focus)] rounded px-3 py-2 text-xs text-[var(--text-main)] focus:outline-none focus:border-[var(--accent-primary)]"
+											className="flex-1 bg-[var(--bg-base)] border border-[var(--border-focus)] rounded px-3 py-2 text-xs text-[var(--text-main)] focus:outline-none focus:border-[var(--accent-primary)]"
 										/>
 										<select
 											className="bg-[#0f1a0f] border border-[var(--border-focus)] text-[var(--accent-primary)] text-[10px] rounded px-1 outline-none w-20"
@@ -244,7 +244,7 @@ export function ToolsPane({ sessions }: Props) {
 								{isPinging ? "Pinging..." : "Start Ping"}
 							</button>
 
-							<div className="flex-1 mt-4 flex flex-col rounded border border-[var(--border-focus)] bg-black/50 overflow-hidden min-h-[200px]">
+							<div className="flex-1 mt-4 flex flex-col rounded border border-[var(--border-focus)] bg-[var(--bg-base)]/50 overflow-hidden min-h-[200px]">
 								<div className="px-3 py-2 border-b border-[var(--bg-hover)] bg-[var(--bg-surface)] flex items-center justify-between">
 									<span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">Output ({activeSessionName})</span>
 									<button onClick={() => setResults([])} className="text-[10px] text-[var(--text-muted)] hover:text-[var(--accent-primary)]">Clear</button>
@@ -274,7 +274,7 @@ export function ToolsPane({ sessions }: Props) {
 											value={destination}
 											onChange={(e) => setDestination(e.target.value)}
 											placeholder="google.com or 8.8.8.8"
-											className="flex-1 bg-black border border-[var(--border-focus)] rounded px-3 py-2 text-xs text-[var(--text-main)] focus:outline-none focus:border-[var(--accent-primary)]"
+											className="flex-1 bg-[var(--bg-base)] border border-[var(--border-focus)] rounded px-3 py-2 text-xs text-[var(--text-main)] focus:outline-none focus:border-[var(--accent-primary)]"
 										/>
 										<select
 											className="bg-[#0f1a0f] border border-[var(--border-focus)] text-[var(--accent-primary)] text-[10px] rounded px-1 outline-none w-20"
@@ -301,7 +301,7 @@ export function ToolsPane({ sessions }: Props) {
 							<div className="flex-1 flex flex-col gap-4 min-h-[500px]">
 								<TracerouteGraph rawResults={traceResults} />
 
-								<div className="h-48 flex flex-col rounded border border-[var(--border-focus)] bg-black/50 overflow-hidden shrink-0">
+								<div className="h-48 flex flex-col rounded border border-[var(--border-focus)] bg-[var(--bg-base)]/50 overflow-hidden shrink-0">
 									<div className="px-3 py-1.5 border-b border-[var(--bg-hover)] bg-[var(--bg-surface)] flex items-center justify-between">
 										<span className="text-[9px] font-bold text-[var(--text-muted)] uppercase tracking-widest">Raw Log ({activeSessionName})</span>
 										<button onClick={() => setTraceResults([])} className="text-[9px] text-[var(--text-muted)] hover:text-[var(--accent-primary)]">Clear</button>
@@ -333,7 +333,7 @@ export function ToolsPane({ sessions }: Props) {
 										</button>
 									</div>
 
-									<div className="flex-1 min-h-[300px] border border-[var(--border-focus)] rounded bg-black/50 overflow-hidden flex flex-col">
+									<div className="flex-1 min-h-[300px] border border-[var(--border-focus)] rounded bg-[var(--bg-base)]/50 overflow-hidden flex flex-col">
 										<div className="grid grid-cols-4 px-3 py-2 border-b border-[var(--bg-hover)] bg-[var(--bg-surface)] text-[10px] font-bold text-[var(--text-muted)] uppercase">
 											<span>Proto</span>
 											<span>Port</span>
@@ -371,7 +371,7 @@ export function ToolsPane({ sessions }: Props) {
 													value={destination}
 													onChange={(e) => setDestination(e.target.value)}
 													placeholder="google.com"
-													className="flex-1 bg-black border border-[var(--border-focus)] rounded px-3 py-2 text-xs text-[var(--text-main)] focus:outline-none focus:border-[var(--accent-primary)]"
+													className="flex-1 bg-[var(--bg-base)] border border-[var(--border-focus)] rounded px-3 py-2 text-xs text-[var(--text-main)] focus:outline-none focus:border-[var(--accent-primary)]"
 												/>
 												<select
 													className="bg-[#0f1a0f] border border-[var(--border-focus)] text-[var(--accent-primary)] text-[10px] rounded px-1 outline-none w-20"
@@ -392,7 +392,7 @@ export function ToolsPane({ sessions }: Props) {
 												id="port-checker-input"
 												type="number"
 												placeholder="443"
-												className="w-full bg-black border border-[var(--border-focus)] rounded px-3 py-2 text-xs text-[var(--text-main)] focus:outline-none focus:border-[var(--accent-primary)]"
+												className="w-full bg-[var(--bg-base)] border border-[var(--border-focus)] rounded px-3 py-2 text-xs text-[var(--text-main)] focus:outline-none focus:border-[var(--accent-primary)]"
 												onKeyDown={(e) => {
 													if (e.key === 'Enter') {
 														const port = parseInt(e.currentTarget.value);

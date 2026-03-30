@@ -166,7 +166,7 @@ export default function App() {
           style={{ zIndex: 10 }}
         />
 
-        <div className="flex-1 flex flex-col overflow-hidden relative" style={{ background: "#050a05" }}>
+        <div className="flex-1 flex flex-col overflow-hidden relative" style={{ background: "var(--bg-base)" }}>
           {/* Terminal Layer - Persists terminals for all open tabs */}
           <div className="flex-1 relative flex flex-col" style={{ display: activeTab === "Sessions" && activeId !== null ? "flex" : "none" }}>
             {openTabIds.map(id => {
@@ -185,7 +185,7 @@ export default function App() {
             <div className="flex-1 flex flex-col items-center justify-center text-center select-none" style={{ opacity: 0.4 }}>
               <div className="text-6xl mb-4 crt-glow" style={{ color: "var(--accent-primary)" }}>🖧</div>
               <h2 className="text-xl font-bold tracking-widest" style={{ color: "var(--accent-primary)" }}>IZORATE TERMINAL</h2>
-              <p className="text-xs font-medium mt-2" style={{ color: "#4a8a4a" }}>Select a session from the sidebar to connect.</p>
+              <p className="text-xs font-medium mt-2" style={{ color: "var(--text-muted)" }}>Select a session from the sidebar to connect.</p>
             </div>
           )}
 

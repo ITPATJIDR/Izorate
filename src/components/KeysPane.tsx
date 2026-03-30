@@ -157,7 +157,7 @@ export function KeysPane() {
 
 			{/* Add/Edit Modal */}
 			{isModalOpen && (
-				<div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+				<div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-[var(--bg-base)]/80 backdrop-blur-sm animate-in fade-in duration-200">
 					<div className="w-full max-w-md bg-[var(--bg-surface)] border border-[var(--border-focus)] rounded-lg shadow-2xl overflow-hidden">
 						<div className="px-6 py-4 border-b border-[var(--bg-hover)] bg-[#0f1a0f] flex items-center justify-between">
 							<h3 className="text-sm font-bold text-[var(--accent-primary)] crt-glow uppercase tracking-widest">
@@ -173,7 +173,7 @@ export function KeysPane() {
 									type="text"
 									value={name}
 									onChange={(e) => setName(e.target.value)}
-									className="w-full bg-black border border-[var(--border-focus)] rounded px-3 py-2 text-sm text-[var(--text-main)] focus:outline-none focus:border-[var(--accent-primary)]"
+									className="w-full bg-[var(--bg-base)] border border-[var(--border-focus)] rounded px-3 py-2 text-sm text-[var(--text-main)] focus:outline-none focus:border-[var(--accent-primary)]"
 									placeholder="e.g. Production Web Server"
 								/>
 							</div>
@@ -184,7 +184,7 @@ export function KeysPane() {
 									type="text"
 									value={username}
 									onChange={(e) => setUsername(e.target.value)}
-									className="w-full bg-black border border-[var(--border-focus)] rounded px-3 py-2 text-sm text-[var(--text-main)] focus:outline-none focus:border-[var(--accent-primary)]"
+									className="w-full bg-[var(--bg-base)] border border-[var(--border-focus)] rounded px-3 py-2 text-sm text-[var(--text-main)] focus:outline-none focus:border-[var(--accent-primary)]"
 								/>
 							</div>
 
@@ -194,7 +194,7 @@ export function KeysPane() {
 									type="password"
 									value={password}
 									onChange={(e) => setPassword(e.target.value)}
-									className="w-full bg-black border border-[var(--border-focus)] rounded px-3 py-2 text-sm text-[var(--text-main)] focus:outline-none focus:border-[var(--accent-primary)]"
+									className="w-full bg-[var(--bg-base)] border border-[var(--border-focus)] rounded px-3 py-2 text-sm text-[var(--text-main)] focus:outline-none focus:border-[var(--accent-primary)]"
 								/>
 							</div>
 
@@ -203,7 +203,7 @@ export function KeysPane() {
 								<textarea
 									value={privateKey}
 									onChange={(e) => setPrivateKey(e.target.value)}
-									className="w-full h-24 bg-black border border-[var(--border-focus)] rounded px-3 py-2 text-[10px] font-mono text-[var(--text-main)] focus:outline-none focus:border-[var(--accent-primary)] resize-none"
+									className="w-full h-24 bg-[var(--bg-base)] border border-[var(--border-focus)] rounded px-3 py-2 text-[10px] font-mono text-[var(--text-main)] focus:outline-none focus:border-[var(--accent-primary)] resize-none"
 									placeholder="-----BEGIN RSA PRIVATE KEY-----"
 								/>
 							</div>
@@ -215,13 +215,13 @@ export function KeysPane() {
 										type="password"
 										value={passphrase}
 										onChange={(e) => setPassphrase(e.target.value)}
-										className="w-full bg-black border border-[#ffa50040] rounded px-3 py-2 text-sm text-[var(--text-main)] focus:outline-none focus:border-[#ffa500]"
+										className="w-full bg-[var(--bg-base)] border border-[#ffa50040] rounded px-3 py-2 text-sm text-[var(--text-main)] focus:outline-none focus:border-[#ffa500]"
 									/>
 								</div>
 							)}
 						</div>
 
-						<div className="px-6 py-4 bg-black/40 flex justify-end gap-3">
+						<div className="px-6 py-4 bg-[var(--bg-base)]/40 flex justify-end gap-3">
 							<button
 								onClick={() => setIsModalOpen(false)}
 								className="px-4 py-2 text-xs text-[var(--text-muted)] hover:text-[var(--accent-primary)] uppercase font-bold"

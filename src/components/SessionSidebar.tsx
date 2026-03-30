@@ -153,10 +153,10 @@ export function SessionSidebar({
 		: [...new Set(filtered.map(s => s.group))];
 
 	return (
-		<div className="relative flex flex-col h-full shrink-0" style={{ width: `${width}px`, background: "#0d0d0d", borderRight: "1px solid var(--accent-primary)15" }}>
+		<div className="relative flex flex-col h-full shrink-0" style={{ width: `${width}px`, background: "var(--bg-surface)", borderRight: "1px solid var(--accent-primary)15" }}>
 			{/* Search & Add Group Header */}
 			<div className="flex flex-col gap-2 p-2 border-b" style={{ borderColor: "var(--border-focus)" }}>
-				<div className="flex items-center gap-2 px-2 py-1.5 rounded" style={{ background: "#0f1a0f", border: "1px solid var(--accent-primary)25" }}>
+				<div className="flex items-center gap-2 px-2 py-1.5 rounded" style={{ background: "var(--bg-surface)", border: "1px solid var(--accent-primary)25" }}>
 					<span style={{ color: "var(--accent-primary)80" }}>⌕</span>
 					<input
 						className="bg-transparent text-xs outline-none flex-1 placeholder-emerald-900"
@@ -180,7 +180,7 @@ export function SessionSidebar({
 			</div>
 
 			{isCreatingGroup && (
-				<div className="px-2 py-2 border-b" style={{ borderColor: "var(--border-focus)", background: "#0a140a" }}>
+				<div className="px-2 py-2 border-b" style={{ borderColor: "var(--border-focus)", background: "var(--bg-base)" }}>
 					<input
 						autoFocus
 						className="w-full bg-transparent text-xs outline-none px-2 py-1 rounded placeholder-emerald-900"
@@ -226,7 +226,7 @@ export function SessionSidebar({
 										setContextMenu({ x: e.pageX, y: e.pageY, type: "group", name: group });
 									}
 								}}
-								className="w-full px-3 py-1.5 flex items-center gap-1 text-xs font-semibold tracking-widest transition-colors hover:bg-black/20"
+								className="w-full px-3 py-1.5 flex items-center gap-1 text-xs font-semibold tracking-widest transition-colors hover:bg-[var(--bg-base)]/20"
 								style={{ color: isDragOver ? "var(--accent-primary)" : "var(--accent-primary)50" }}
 							>
 								<span>{isCollapsed ? "▸" : "▾"}</span>
@@ -259,7 +259,7 @@ export function SessionSidebar({
 											}}
 											className="w-full flex items-center gap-2 px-4 py-1.5 text-left transition-all duration-150 cursor-grab active:cursor-grabbing"
 											style={{
-												background: activeId === session.id ? "#0f2a0f" : "transparent",
+												background: activeId === session.id ? "var(--bg-hover)" : "transparent",
 												borderLeft: activeId === session.id ? "2px solid var(--accent-primary)" : "2px solid transparent",
 											}}
 										>
@@ -298,7 +298,7 @@ export function SessionSidebar({
 					style={{
 						left: contextMenu.x,
 						top: contextMenu.y,
-						background: "#0d0d0d",
+						background: "var(--bg-surface)",
 						borderColor: "var(--border-focus)",
 						minWidth: "140px",
 					}}
@@ -307,14 +307,14 @@ export function SessionSidebar({
 					{contextMenu.type === "session" ? (
 						<>
 							<button
-								className="px-4 py-1.5 text-xs text-left hover:bg-black/40 transition-colors"
+								className="px-4 py-1.5 text-xs text-left hover:bg-[var(--bg-base)]/40 transition-colors"
 								style={{ color: "var(--accent-primary)" }}
 								onClick={() => { onEditSession(contextMenu.session); setContextMenu(null); }}
 							>
 								✎ Edit Connection
 							</button>
 							<button
-								className="px-4 py-1.5 text-xs text-left hover:bg-black/40 transition-colors"
+								className="px-4 py-1.5 text-xs text-left hover:bg-[var(--bg-base)]/40 transition-colors"
 								style={{ color: "#ff6b6b" }}
 								onClick={() => { handleDeleteSession(contextMenu.session.id); setContextMenu(null); }}
 							>
@@ -324,14 +324,14 @@ export function SessionSidebar({
 					) : (
 						<>
 							<button
-								className="px-4 py-1.5 text-xs text-left hover:bg-black/40 transition-colors"
+								className="px-4 py-1.5 text-xs text-left hover:bg-[var(--bg-base)]/40 transition-colors"
 								style={{ color: "var(--accent-primary)" }}
 								onClick={() => { handleRenameGroup(contextMenu.name); setContextMenu(null); }}
 							>
 								✎ Rename Group
 							</button>
 							<button
-								className="px-4 py-1.5 text-xs text-left hover:bg-black/40 transition-colors"
+								className="px-4 py-1.5 text-xs text-left hover:bg-[var(--bg-base)]/40 transition-colors"
 								style={{ color: "#ff6b6b" }}
 								onClick={() => { handleDeleteGroup(contextMenu.name); setContextMenu(null); }}
 							>

@@ -35,7 +35,7 @@ export function TerminalPane({ session }: Props) {
 		// Initialize Xterm.js
 		const term = new Terminal({
 			theme: {
-				background: "#0a0a0a",
+				background: "var(--bg-base)",
 				foreground: fontColor,
 				cursor: fontColor,
 				selectionBackground: `${fontColor}40`,
@@ -167,6 +167,16 @@ export function TerminalPane({ session }: Props) {
 
 		window.addEventListener("resize", handleWindowResize);
 		const terminalEl = terminalRef.current;
+		const parentEl = terminalEl?.parentElement;
+
+		let resizeObserver: ResizeObserver | null = null;
+		if (parentEl) {
+			resizeObserver = new ResizeObserver(() => {
+				try { fitAddon.fit(); } catch (e) { }
+			});
+			resizeObserver.observe(parentEl);
+		}
+
 		if (terminalEl) {
 			terminalEl.addEventListener("keydown", handleKeyDown, true);
 			terminalEl.addEventListener("wheel", handleWheel, { passive: false });
@@ -175,6 +185,7 @@ export function TerminalPane({ session }: Props) {
 
 		return () => {
 			window.removeEventListener("resize", handleWindowResize);
+			if (resizeObserver) resizeObserver.disconnect();
 			if (terminalEl) {
 				terminalEl.removeEventListener("keydown", handleKeyDown, true);
 				terminalEl.removeEventListener("wheel", handleWheel);
@@ -205,7 +216,7 @@ export function TerminalPane({ session }: Props) {
 	useEffect(() => {
 		if (xtermRef.current) {
 			xtermRef.current.options.theme = {
-				background: "#0a0a0a",
+				background: "var(--bg-base)",
 				foreground: fontColor,
 				cursor: fontColor,
 				selectionBackground: `${fontColor}40`,
@@ -270,7 +281,7 @@ export function TerminalPane({ session }: Props) {
 	return (
 		<div className="flex-1 flex flex-col bg-[var(--bg-base)]">
 			{/* Header */}
-			<div className="flex items-center justify-between px-4 py-2 border-b" style={{ borderColor: "var(--border-focus)", background: "#0d0d0d" }}>
+			<div className="flex items-center justify-between px-4 py-2 border-b" style={{ borderColor: "var(--border-focus)", background: "var(--bg-surface)" }}>
 				<div className="flex items-center gap-2">
 					<span className="text-sm font-semibold crt-glow" style={{ color: fontColor }}>
 						{session.name}
@@ -310,7 +321,7 @@ export function TerminalPane({ session }: Props) {
 
 			{/* Terminal Container */}
 			<div className="flex-1 relative overflow-hidden">
-				<div ref={terminalRef} className="absolute inset-0" style={{ padding: '8px 4px 8px 8px' }} />
+				<div ref={terminalRef} className="absolute inset-0" style={{ padding: '2px' }} />
 			</div>
 		</div>
 	);

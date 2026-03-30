@@ -13,7 +13,7 @@ export function PasswordPromptModal({ isOpen, onClose, onSubmit, sessionName }: 
 	if (!isOpen) return null;
 
 	return (
-		<div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+		<div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-[var(--bg-base)]/60 backdrop-blur-sm animate-in fade-in duration-200">
 			<div className="w-full max-w-sm bg-[var(--bg-surface)] border border-[var(--border-focus)] rounded-lg shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden">
 				<div className="px-6 py-4 border-b border-[var(--bg-hover)] bg-[#0f1a0f]">
 					<h3 className="text-sm font-bold text-[var(--accent-primary)] crt-glow uppercase tracking-widest">Authentication Required</h3>
@@ -35,13 +35,13 @@ export function PasswordPromptModal({ isOpen, onClose, onSubmit, sessionName }: 
 								if (e.key === "Enter") onSubmit(password);
 								if (e.key === "Escape") onClose();
 							}}
-							className="w-full bg-black border border-[var(--border-focus)] rounded px-3 py-2 text-sm text-[var(--text-main)] focus:outline-none focus:border-[var(--accent-primary)] transition-colors"
+							className="w-full bg-[var(--bg-base)] border border-[var(--border-focus)] rounded px-3 py-2 text-sm text-[var(--text-main)] focus:outline-none focus:border-[var(--accent-primary)] transition-colors"
 							placeholder="••••••••"
 						/>
 					</div>
 				</div>
 
-				<div className="px-6 py-4 bg-black/40 flex justify-end gap-3">
+				<div className="px-6 py-4 bg-[var(--bg-base)]/40 flex justify-end gap-3">
 					<button
 						onClick={onClose}
 						className="px-4 py-2 text-xs text-[var(--text-muted)] hover:text-[var(--accent-primary)] transition-colors uppercase font-bold"

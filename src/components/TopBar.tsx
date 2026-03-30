@@ -11,7 +11,7 @@ export function TopBar({ connectedCount, activeTab, hasActiveSession, onTabChang
 	const dateStr = now.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 
 	return (
-		<div className="flex items-center justify-between px-4 py-2 border-b" style={{ background: "#0a0a0a", borderColor: "var(--border-focus)" }}>
+		<div className="flex items-center justify-between px-4 py-2 border-b" style={{ background: "var(--bg-base)", borderColor: "var(--border-focus)" }}>
 			{/* Left: Logo */}
 			<div className="flex items-center gap-3">
 				<span className="crt-glow text-sm font-bold tracking-widest" style={{ color: "var(--accent-primary)" }}>

@@ -120,7 +120,7 @@ export function TracerouteGraph({ rawResults }: TracerouteGraphProps) {
 	};
 
 	return (
-		<div className="flex-1 min-h-[500px] relative bg-black/40 rounded-lg border border-[var(--bg-hover)] overflow-hidden p-6 select-none cursor-default">
+		<div className="flex-1 min-h-[500px] relative bg-[var(--bg-base)]/40 rounded-lg border border-[var(--bg-hover)] overflow-hidden p-6 select-none cursor-default">
 			<div className="absolute inset-0 pointer-events-none opacity-5 shadow-[inset_0_0_100px_rgba(0,255,65,0.2)]" />
 
 			<div className="relative z-10 w-full h-full flex flex-col items-center">

@@ -13,16 +13,18 @@
   --red: #ef4444;
   /* Softer Red */
 
-  --bg-base: #0a0a0a;
-  --bg-surface: #0f1214;
+  --bg-base: #0f1115;
+  /* Reading-friendly deep slate-gray */
+  --bg-surface: #161b22;
   --bg: var(--bg-base);
   --bg-panel: var(--bg-surface);
-  --bg-card: #14181a;
+  --bg-card: #1c2128;
 
   --border: #1e293b;
   --border-active: #10b98130;
 
-  --text: #e2e8f0;
+  --text: #d1d5db;
+  /* Softer white (Slate-300) for reading */
   --text-dim: #94a3b8;
 
   /* New Semantic Variables */
@@ -186,11 +188,16 @@ body {
 
 /* Markdown Content Styling */
 .markdown-content {
-  line-height: 1.5;
+  line-height: 1.65;
+  /* Increased for readability */
+  font-size: 13px;
+  /* Comfortable reading size */
+  color: var(--text);
 }
 
 .markdown-content p {
-  margin-bottom: 0.75rem;
+  margin-bottom: 1rem;
+  /* More breathing room */
 }
 
 .markdown-content p:last-child {
@@ -199,8 +206,8 @@ body {
 
 .markdown-content ul,
 .markdown-content ol {
-  margin-bottom: 0.75rem;
-  padding-left: 1.25rem;
+  margin-bottom: 1rem;
+  padding-left: 1.5rem;
 }
 
 .markdown-content ul {
@@ -212,7 +219,7 @@ body {
 }
 
 .markdown-content li {
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.5rem;
 }
 
 .markdown-content code {

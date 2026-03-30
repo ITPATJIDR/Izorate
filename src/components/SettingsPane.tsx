@@ -115,7 +115,7 @@ export function SettingsPane() {
 											onClick={() => setTerminalFontColor(preset.color)}
 											className={`flex items-center gap-2 px-3 py-2 rounded border transition-all ${terminalFontColor.toLowerCase() === preset.color.toLowerCase()
 												? "bg-[var(--bg-hover)] border-[var(--border-focus)]"
-												: "bg-black/40 border-[#ffffff10] hover:border-[#ffffff30]"
+												: "bg-[var(--bg-base)]/40 border-[#ffffff10] hover:border-[#ffffff30]"
 												}`}
 										>
 											<div className="w-3 h-3 rounded-full shadow-[0_0_8px_rgba(0,0,0,0.5)]" style={{ background: preset.color }} />
@@ -138,7 +138,7 @@ export function SettingsPane() {
 										value={recordingPath}
 										onChange={(e) => setRecordingPath(e.target.value)}
 										placeholder="/home/user/recordings"
-										className="flex-1 bg-black border border-[var(--border-focus)] rounded px-3 py-2 text-xs text-[var(--text-main)] focus:outline-none focus:border-[var(--accent-primary)] min-w-0"
+										className="flex-1 bg-[var(--bg-base)] border border-[var(--border-focus)] rounded px-3 py-2 text-xs text-[var(--text-main)] focus:outline-none focus:border-[var(--accent-primary)] min-w-0"
 									/>
 								</div>
 								<p className="text-[10px] text-[var(--text-muted)]">The directory where terminal video recordings will be saved. Ensure the path exists and is writable.</p>
@@ -154,7 +154,7 @@ export function SettingsPane() {
 									<select
 										value={aiProvider}
 										onChange={(e) => setAiProvider(e.target.value)}
-										className="w-full bg-black border border-[var(--border-focus)] rounded px-3 py-2 text-xs text-[var(--accent-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
+										className="w-full bg-[var(--bg-base)] border border-[var(--border-focus)] rounded px-3 py-2 text-xs text-[var(--accent-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
 									>
 										<option value="OpenAI">OpenAI</option>
 										<option value="Anthropic">Anthropic</option>
@@ -173,7 +173,7 @@ export function SettingsPane() {
 											value={openaiApiKey}
 											onChange={(e) => setOpenaiApiKey(e.target.value)}
 											placeholder="sk-..."
-											className="w-full bg-black border border-[var(--border-focus)] rounded px-3 py-2 text-xs text-[var(--text-main)] focus:outline-none focus:border-[var(--accent-primary)]"
+											className="w-full bg-[var(--bg-base)] border border-[var(--border-focus)] rounded px-3 py-2 text-xs text-[var(--text-main)] focus:outline-none focus:border-[var(--accent-primary)]"
 										/>
 									</div>
 								)}
@@ -185,7 +185,7 @@ export function SettingsPane() {
 											value={anthropicApiKey}
 											onChange={(e) => setAnthropicApiKey(e.target.value)}
 											placeholder="sk-ant-..."
-											className="w-full bg-black border border-[var(--border-focus)] rounded px-3 py-2 text-xs text-[var(--text-main)] focus:outline-none focus:border-[var(--accent-primary)]"
+											className="w-full bg-[var(--bg-base)] border border-[var(--border-focus)] rounded px-3 py-2 text-xs text-[var(--text-main)] focus:outline-none focus:border-[var(--accent-primary)]"
 										/>
 									</div>
 								)}
@@ -197,7 +197,7 @@ export function SettingsPane() {
 											value={geminiApiKey}
 											onChange={(e) => setGeminiApiKey(e.target.value)}
 											placeholder="AIza..."
-											className="w-full bg-black border border-[var(--border-focus)] rounded px-3 py-2 text-xs text-[var(--text-main)] focus:outline-none focus:border-[var(--accent-primary)]"
+											className="w-full bg-[var(--bg-base)] border border-[var(--border-focus)] rounded px-3 py-2 text-xs text-[var(--text-main)] focus:outline-none focus:border-[var(--accent-primary)]"
 										/>
 									</div>
 								)}

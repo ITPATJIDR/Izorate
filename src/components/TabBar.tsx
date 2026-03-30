@@ -13,7 +13,7 @@ interface TabBarProps {
 export function TabBar({ sessions, activeId, openTabIds, onSelect, onClose, onNew }: TabBarProps) {
 	const openTabs = openTabIds.map(id => sessions.find(s => s.id === id)).filter(Boolean) as Session[];
 	return (
-		<div className="flex items-end gap-0 px-2 border-b overflow-x-auto" style={{ background: "#0a0a0a", borderColor: "var(--border-focus)" }}>
+		<div className="flex items-end gap-0 px-2 border-b overflow-x-auto" style={{ background: "var(--bg-base)", borderColor: "var(--border-focus)" }}>
 			{openTabs.map(s => (
 				<button
 					key={s.id}
@@ -31,7 +31,7 @@ export function TabBar({ sessions, activeId, openTabIds, onSelect, onClose, onNe
 					<div className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[s.status]}`} />
 					{s.name}
 					<span
-						className="ml-1 opacity-50 hover:opacity-100 p-1 hover:bg-black/20 rounded cursor-pointer"
+						className="ml-1 opacity-50 hover:opacity-100 p-1 hover:bg-[var(--bg-base)]/20 rounded cursor-pointer"
 						onClick={(e) => onClose(s.id, e)}
 					>
 						✕
