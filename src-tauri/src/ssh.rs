@@ -250,10 +250,25 @@ pub async fn upload_file(state: tauri::State<'_, SshManager>, id: i64, local_pat
         .ok_or("SFTP not available on this session")?;
         
     let sftp = sftp_arc.lock().await;
-    let data = tokio::fs::read(&local_path).await.map_err(|e| e.to_string())?;
+
+    // Handle Windows UNC paths from Tauri v2 drop events
+    let clean_local_path = if local_path.starts_with(r"\\?\") {
+        local_path.strip_prefix(r"\\?\").unwrap_or(&local_path).to_string()
+    } else {
+        local_path.clone()
+    };
+
+    let data = tokio::fs::read(&clean_local_path)
+        .await
+        .map_err(|e| format!("Failed to read local file: {}", e))?;
     
-    let mut file = sftp.create(&remote_path).await.map_err(|e| e.to_string())?;
-    file.write_all(&data).await.map_err(|e| e.to_string())?;
+    let mut file = sftp.create(&remote_path)
+        .await
+        .map_err(|e| format!("Failed to create remote file: {}", e))?;
+        
+    file.write_all(&data)
+        .await
+        .map_err(|e| format!("Failed to write data to remote file: {}", e))?;
     
     Ok(())
 }

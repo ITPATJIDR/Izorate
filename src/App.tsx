@@ -162,7 +162,7 @@ export default function App() {
         {/* Left Resize Handle */}
         <div
           onMouseDown={startResizingSidebar}
-          className={`w-1 cursor-col-resize transition-colors hover:bg-[#00ff4140] ${isResizingSidebar ? 'bg-[#00ff4160]' : 'bg-transparent'}`}
+          className={`w-1 cursor-col-resize transition-colors hover:bg-[var(--border-focus)] ${isResizingSidebar ? 'bg-[var(--accent-primary)60]' : 'bg-transparent'}`}
           style={{ zIndex: 10 }}
         />
 
@@ -183,8 +183,8 @@ export default function App() {
           {/* Welcome Screen / Empty State */}
           {activeTab === "Sessions" && activeId === null && (
             <div className="flex-1 flex flex-col items-center justify-center text-center select-none" style={{ opacity: 0.4 }}>
-              <div className="text-6xl mb-4 crt-glow" style={{ color: "#00ff41" }}>🖧</div>
-              <h2 className="text-xl font-bold tracking-widest" style={{ color: "#00ff41" }}>IZORATE TERMINAL</h2>
+              <div className="text-6xl mb-4 crt-glow" style={{ color: "var(--accent-primary)" }}>🖧</div>
+              <h2 className="text-xl font-bold tracking-widest" style={{ color: "var(--accent-primary)" }}>IZORATE TERMINAL</h2>
               <p className="text-xs font-medium mt-2" style={{ color: "#4a8a4a" }}>Select a session from the sidebar to connect.</p>
             </div>
           )}
@@ -215,17 +215,17 @@ export default function App() {
         {aiPanelWidth > 0 ? (
           <div
             onMouseDown={startResizingAiPanel}
-            className={`w-1 cursor-col-resize transition-colors hover:bg-[#00ff4140] ${isResizingAiPanel ? 'bg-[#00ff4160]' : 'bg-transparent'}`}
+            className={`w-1 cursor-col-resize transition-colors hover:bg-[var(--border-focus)] ${isResizingAiPanel ? 'bg-[var(--accent-primary)60]' : 'bg-transparent'}`}
             style={{ zIndex: 10 }}
           />
         ) : (
           <div
             onClick={toggleAiPanel}
-            className="w-4 bg-[#0a0a0a] border-l border-[#00ff4115] hover:bg-[#00ff4108] cursor-pointer flex flex-col items-center justify-center gap-1 transition-all group"
+            className="w-4 bg-[var(--bg-base)] border-l border-[var(--bg-hover)] hover:bg-[var(--bg-hover)] cursor-pointer flex flex-col items-center justify-center gap-1 transition-all group"
             title="Expand AI Assistant"
           >
-            <span className="text-[10px] text-[#4a6e4a] group-hover:text-[#00ff41] transition-colors" style={{ writingMode: 'vertical-rl' }}>AI ASSISTANT</span>
-            <span className="text-[10px] text-[#4a6e4a] group-hover:text-[#00ff41]">««</span>
+            <span className="text-[10px] text-[var(--text-muted)] group-hover:text-[var(--accent-primary)] transition-colors" style={{ writingMode: 'vertical-rl' }}>AI ASSISTANT</span>
+            <span className="text-[10px] text-[var(--text-muted)] group-hover:text-[var(--accent-primary)]">««</span>
           </div>
         )}
 

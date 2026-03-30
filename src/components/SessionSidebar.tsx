@@ -153,25 +153,25 @@ export function SessionSidebar({
 		: [...new Set(filtered.map(s => s.group))];
 
 	return (
-		<div className="relative flex flex-col h-full shrink-0" style={{ width: `${width}px`, background: "#0d0d0d", borderRight: "1px solid #00ff4115" }}>
+		<div className="relative flex flex-col h-full shrink-0" style={{ width: `${width}px`, background: "#0d0d0d", borderRight: "1px solid var(--accent-primary)15" }}>
 			{/* Search & Add Group Header */}
-			<div className="flex flex-col gap-2 p-2 border-b" style={{ borderColor: "#00ff4115" }}>
-				<div className="flex items-center gap-2 px-2 py-1.5 rounded" style={{ background: "#0f1a0f", border: "1px solid #00ff4125" }}>
-					<span style={{ color: "#00ff4180" }}>⌕</span>
+			<div className="flex flex-col gap-2 p-2 border-b" style={{ borderColor: "var(--border-focus)" }}>
+				<div className="flex items-center gap-2 px-2 py-1.5 rounded" style={{ background: "#0f1a0f", border: "1px solid var(--accent-primary)25" }}>
+					<span style={{ color: "var(--accent-primary)80" }}>⌕</span>
 					<input
 						className="bg-transparent text-xs outline-none flex-1 placeholder-emerald-900"
 						placeholder="filter sessions..."
-						style={{ color: "#00ff41", fontFamily: "inherit" }}
+						style={{ color: "var(--accent-primary)", fontFamily: "inherit" }}
 						value={filter}
 						onChange={e => setFilter(e.target.value)}
 					/>
 				</div>
 				<div className="flex justify-between items-center px-1">
-					<span className="text-xs font-semibold" style={{ color: "#4a6e4a" }}>GROUPS</span>
+					<span className="text-xs font-semibold" style={{ color: "var(--text-muted)" }}>GROUPS</span>
 					<button
 						onClick={() => setIsCreatingGroup(true)}
 						className="text-xs hover:text-green-400 transition-colors"
-						style={{ color: "#00ff4160" }}
+						style={{ color: "var(--accent-primary)60" }}
 						title="Create new group"
 					>
 						+
@@ -180,12 +180,12 @@ export function SessionSidebar({
 			</div>
 
 			{isCreatingGroup && (
-				<div className="px-2 py-2 border-b" style={{ borderColor: "#00ff4115", background: "#0a140a" }}>
+				<div className="px-2 py-2 border-b" style={{ borderColor: "var(--border-focus)", background: "#0a140a" }}>
 					<input
 						autoFocus
 						className="w-full bg-transparent text-xs outline-none px-2 py-1 rounded placeholder-emerald-900"
 						placeholder="group name & Enter..."
-						style={{ color: "#00ff41", border: "1px dashed #00ff4140" }}
+						style={{ color: "var(--accent-primary)", border: "1px dashed var(--accent-primary)40" }}
 						value={newGroupName}
 						onChange={e => setNewGroupName(e.target.value)}
 						onKeyDown={handleCreateGroup}
@@ -204,7 +204,7 @@ export function SessionSidebar({
 					return (
 						<div
 							key={group}
-							className={`mb-1 transition-colors duration-200 ${isDragOver ? "bg-[#00ff4110] border-y border-[#00ff4120]" : ""}`}
+							className={`mb-1 transition-colors duration-200 ${isDragOver ? "bg-[var(--bg-hover)] border-y border-[var(--border-focus)]" : ""}`}
 							onDragOver={e => {
 								e.preventDefault();
 								if (dragOverGroup !== group) setDragOverGroup(group);
@@ -227,11 +227,11 @@ export function SessionSidebar({
 									}
 								}}
 								className="w-full px-3 py-1.5 flex items-center gap-1 text-xs font-semibold tracking-widest transition-colors hover:bg-black/20"
-								style={{ color: isDragOver ? "#00ff41" : "#00ff4150" }}
+								style={{ color: isDragOver ? "var(--accent-primary)" : "var(--accent-primary)50" }}
 							>
 								<span>{isCollapsed ? "▸" : "▾"}</span>
 								{group.toUpperCase()}
-								<span className="ml-auto text-[10px]" style={{ color: "#00ff4120" }}>
+								<span className="ml-auto text-[10px]" style={{ color: "var(--accent-primary)20" }}>
 									{groupSessions.length}
 								</span>
 							</button>
@@ -260,11 +260,11 @@ export function SessionSidebar({
 											className="w-full flex items-center gap-2 px-4 py-1.5 text-left transition-all duration-150 cursor-grab active:cursor-grabbing"
 											style={{
 												background: activeId === session.id ? "#0f2a0f" : "transparent",
-												borderLeft: activeId === session.id ? "2px solid #00ff41" : "2px solid transparent",
+												borderLeft: activeId === session.id ? "2px solid var(--accent-primary)" : "2px solid transparent",
 											}}
 										>
 											<div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${STATUS_DOT[session.status]}`} />
-											<span className="text-xs truncate" style={{ color: activeId === session.id ? "#00ff41" : "#4a6e4a" }}>
+											<span className="text-xs truncate" style={{ color: activeId === session.id ? "var(--accent-primary)" : "var(--text-muted)" }}>
 												{TYPE_ICON[session.type]} {session.name}
 											</span>
 										</button>
@@ -277,14 +277,14 @@ export function SessionSidebar({
 			</div>
 
 			{/* Add Session button */}
-			<div className="p-2 border-t" style={{ borderColor: "#00ff4115" }}>
+			<div className="p-2 border-t" style={{ borderColor: "var(--border-focus)" }}>
 				<button
 					onClick={onNewSession}
 					className="w-full py-2 text-xs rounded transition-all duration-200 hover:brightness-125"
 					style={{
 						background: "linear-gradient(135deg, #0f2a0f, #1a4a1a)",
-						border: "1px solid #00ff4140",
-						color: "#00ff41",
+						border: "1px solid var(--accent-primary)40",
+						color: "var(--accent-primary)",
 					}}
 				>
 					+ New Session
@@ -299,7 +299,7 @@ export function SessionSidebar({
 						left: contextMenu.x,
 						top: contextMenu.y,
 						background: "#0d0d0d",
-						borderColor: "#00ff4130",
+						borderColor: "var(--border-focus)",
 						minWidth: "140px",
 					}}
 					onClick={e => e.stopPropagation()}
@@ -308,7 +308,7 @@ export function SessionSidebar({
 						<>
 							<button
 								className="px-4 py-1.5 text-xs text-left hover:bg-black/40 transition-colors"
-								style={{ color: "#00ff41" }}
+								style={{ color: "var(--accent-primary)" }}
 								onClick={() => { onEditSession(contextMenu.session); setContextMenu(null); }}
 							>
 								✎ Edit Connection
@@ -325,7 +325,7 @@ export function SessionSidebar({
 						<>
 							<button
 								className="px-4 py-1.5 text-xs text-left hover:bg-black/40 transition-colors"
-								style={{ color: "#00ff41" }}
+								style={{ color: "var(--accent-primary)" }}
 								onClick={() => { handleRenameGroup(contextMenu.name); setContextMenu(null); }}
 							>
 								✎ Rename Group

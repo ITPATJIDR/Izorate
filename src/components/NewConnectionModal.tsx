@@ -49,8 +49,8 @@ function ThemedSelect({
 				className="w-full appearance-none text-xs px-2 py-1.5 rounded outline-none cursor-pointer"
 				style={{
 					background: "#0f1a0f",
-					border: "1px solid #00ff4130",
-					color: "#00ff41",
+					border: "1px solid var(--accent-primary)30",
+					color: "var(--accent-primary)",
 					fontFamily: "inherit",
 				}}
 			>
@@ -58,7 +58,7 @@ function ThemedSelect({
 			</select>
 			<span
 				className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs"
-				style={{ color: "#00ff4180" }}
+				style={{ color: "var(--accent-primary)80" }}
 			>
 				▾
 			</span>
@@ -169,16 +169,16 @@ export function NewConnectionModal({ onClose, onSaved, editSession }: Props) {
 		>
 			<div
 				className="w-full max-w-md rounded-lg shadow-2xl"
-				style={{ background: "#0d0d0d", border: "1px solid #00ff4130" }}
+				style={{ background: "#0d0d0d", border: "1px solid var(--accent-primary)30" }}
 			>
-				<div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: "#00ff4120" }}>
-					<span className="text-sm font-semibold crt-glow" style={{ color: "#00ff41" }}>
+				<div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: "var(--border-focus)" }}>
+					<span className="text-sm font-semibold crt-glow" style={{ color: "var(--accent-primary)" }}>
 						⌨ {editSession ? "Edit Connection" : "New Connection"}
 					</span>
 					<button
 						onClick={onClose}
 						className="text-xs hover:text-red-400 transition-colors"
-						style={{ color: "#4a6e4a" }}
+						style={{ color: "var(--text-muted)" }}
 					>
 						✕ Close
 					</button>
@@ -195,8 +195,8 @@ export function NewConnectionModal({ onClose, onSaved, editSession }: Props) {
 									className="flex-1 py-1.5 text-xs rounded transition-all duration-150 font-medium"
 									style={
 										form.conn_type === opt.value
-											? { background: "#0f2a0f", border: "1px solid #00ff4150", color: "#00ff41" }
-											: { background: "#0a0a0a", border: "1px solid #00ff4115", color: "#2a4a2a" }
+											? { background: "#0f2a0f", border: "1px solid var(--accent-primary)50", color: "var(--accent-primary)" }
+											: { background: "#0a0a0a", border: "1px solid var(--accent-primary)15", color: "#2a4a2a" }
 									}
 								>
 									{opt.icon} {opt.label}
@@ -280,7 +280,7 @@ export function NewConnectionModal({ onClose, onSaved, editSession }: Props) {
 					</Field>
 
 					{error && (
-						<div className="text-xs px-2 py-1.5 rounded" style={{ background: "#2a0a0a", border: "1px solid #ff2d5530", color: "#ff6b6b" }}>
+						<div className="text-xs px-2 py-1.5 rounded" style={{ background: "#2a0a0a", border: "1px solid var(--red)30", color: "#ff6b6b" }}>
 							⚠ {error}
 						</div>
 					)}
@@ -298,7 +298,7 @@ export function NewConnectionModal({ onClose, onSaved, editSession }: Props) {
 							type="submit"
 							disabled={saving}
 							className="flex-1 py-2 text-xs rounded font-semibold transition-all hover:brightness-125 disabled:opacity-50"
-							style={{ background: "linear-gradient(135deg, #0f2a0f, #1a5a1a)", border: "1px solid #00ff4140", color: "#00ff41" }}
+							style={{ background: "linear-gradient(135deg, #0f2a0f, #1a5a1a)", border: "1px solid var(--accent-primary)40", color: "var(--accent-primary)" }}
 						>
 							{saving ? "Saving..." : editSession ? "✓ Update Connection" : "✓ Save Connection"}
 						</button>
@@ -335,7 +335,7 @@ function Input({
 			value={value}
 			onChange={e => onChange(e.target.value)}
 			className="w-full text-xs px-2 py-1.5 rounded outline-none placeholder-emerald-900"
-			style={{ background: "#0f1a0f", border: "1px solid #00ff4130", color: "#00ff41" }}
+			style={{ background: "#0f1a0f", border: "1px solid var(--accent-primary)30", color: "var(--accent-primary)" }}
 		/>
 	);
 }

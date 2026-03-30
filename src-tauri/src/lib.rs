@@ -1,7 +1,8 @@
 mod db;
 mod ssh;
+mod network_tools;
 
-use std::sync::{Arc, Mutex as StdMutex};
+use std::sync::Mutex as StdMutex;
 use std::fs;
 use std::path::PathBuf;
 use rusqlite::Connection;
@@ -202,31 +203,8 @@ fn save_clipboard_history(app: AppHandle, content: String) -> Result<(), String>
 #[tauri::command]
 async fn ping_host(app: AppHandle, state: State<'_, DbState>, host: String, count: u32, source_session_id: i64, password: Option<String>) -> Result<(), String> {
     if source_session_id == -1 {
-        // Run locally
-        use std::process::Stdio;
-        use tokio::io::{AsyncBufReadExt, BufReader};
-        use tokio::process::Command;
-
-        let mut cmd = Command::new("ping");
-        #[cfg(windows)] {
-            cmd.arg("-n").arg(count.to_string());
-        }
-        #[cfg(not(windows))] {
-            cmd.arg("-c").arg(count.to_string());
-        }
-
-        let mut child = cmd.arg(&host)
-            .stdout(Stdio::piped())
-            .spawn()
-            .map_err(|e| format!("Failed to start ping: {}. Is 'ping' installed and in your PATH?", e))?;
-
-        let stdout = child.stdout.take().unwrap();
-        let mut reader = BufReader::new(stdout).lines();
-
-        while let Ok(Some(line)) = reader.next_line().await {
-            app.emit("ping-result", line).map_err(|e| e.to_string())?;
-        }
-        let _ = child.wait().await;
+        // Run locally with hybrid approach (binary → TCP fallback)
+        network_tools::ping(&app, &host, count).await?;
     } else {
         // Run remotely via SSH (Assume Linux/Unix remote)
         let config = {
@@ -242,38 +220,8 @@ async fn ping_host(app: AppHandle, state: State<'_, DbState>, host: String, coun
 #[tauri::command]
 async fn traceroute_host(app: AppHandle, state: State<'_, DbState>, host: String, source_session_id: i64, password: Option<String>) -> Result<(), String> {
     if source_session_id == -1 {
-        // Run locally
-        use std::process::Stdio;
-        use tokio::io::{AsyncBufReadExt, BufReader};
-        use tokio::process::Command;
-
-        #[cfg(windows)]
-        let mut cmd = Command::new("tracert");
-        #[cfg(not(windows))]
-        let mut cmd = Command::new("traceroute");
-
-        #[cfg(windows)] {
-            cmd.arg("-d"); // No hostname resolution
-        }
-        #[cfg(not(windows))] {
-            cmd.arg("-n").arg("-w").arg("1").arg("-q").arg("1");
-        }
-
-        let mut child = cmd.arg(&host)
-            .stdout(Stdio::piped())
-            .spawn()
-            .map_err(|e| {
-                let bin = if cfg!(windows) { "tracert" } else { "traceroute" };
-                format!("Failed to start {}: {}. Please ensure it is installed and in your PATH.", bin, e)
-            })?;
-
-        let stdout = child.stdout.take().unwrap();
-        let mut reader = BufReader::new(stdout).lines();
-
-        while let Ok(Some(line)) = reader.next_line().await {
-            app.emit("traceroute-result", line).map_err(|e| e.to_string())?;
-        }
-        let _ = child.wait().await;
+        // Run locally with hybrid approach (binary → TCP fallback)
+        network_tools::traceroute(&app, &host).await?;
     } else {
         // Run remotely (Assume Linux/Unix remote)
         let config = {
@@ -288,15 +236,12 @@ async fn traceroute_host(app: AppHandle, state: State<'_, DbState>, host: String
 
 #[tauri::command]
 async fn get_local_ports(_app: AppHandle, state: State<'_, DbState>, source_session_id: i64, password: Option<String>) -> Result<Vec<serde_json::Value>, String> {
-    let stdout = if source_session_id == -1 {
-        use std::process::Command;
-        let mut cmd = Command::new("netstat");
-        #[cfg(windows)] { cmd.arg("-ano"); }
-        #[cfg(not(windows))] { cmd.arg("-tuln"); }
+    if source_session_id == -1 {
+        // Use pure-Rust netstat2 crate — no external binary needed
+        return network_tools::get_listening_ports();
+    }
 
-        let output = cmd.output().map_err(|e| format!("Failed to run netstat: {}. Is it installed?", e))?;
-        String::from_utf8_lossy(&output.stdout).to_string()
-    } else {
+    let stdout = {
         let config = {
             let conn = state.0.lock().map_err(|e| e.to_string())?;
             db::get_all(&conn).unwrap().into_iter().find(|c| c.id == Some(source_session_id)).ok_or("Session not found")?
@@ -320,6 +265,7 @@ async fn get_local_ports(_app: AppHandle, state: State<'_, DbState>, source_sess
         output
     };
 
+    // Parse remote SSH netstat output
     let mut ports = Vec::new();
     for line in stdout.lines() {
         let parts: Vec<&str> = line.split_whitespace().collect();
@@ -327,11 +273,7 @@ async fn get_local_ports(_app: AppHandle, state: State<'_, DbState>, source_sess
             let proto = parts[0].to_uppercase();
             if proto != "TCP" && proto != "UDP" { continue; }
             
-            let local_addr = if cfg!(windows) {
-                parts.get(1).copied().unwrap_or("")
-            } else {
-                parts.get(3).copied().unwrap_or("")
-            };
+            let local_addr = parts.get(3).copied().unwrap_or("");
 
             if let Some(port_str) = local_addr.split(':').last().or_else(|| local_addr.split('.').last()) {
                 if let Ok(port) = port_str.parse::<u32>() {
@@ -445,6 +387,11 @@ async fn list_models(provider: String, api_key: String) -> Result<Vec<String>, S
 }
 
 #[tauri::command]
+fn check_tool_availability() -> serde_json::Value {
+    network_tools::check_availability()
+}
+
+#[tauri::command]
 async fn save_terminal_video(app: AppHandle, bytes: Vec<u8>, filename: String) -> Result<String, String> {
     let state = app.state::<DbState>();
     let path = {
@@ -510,6 +457,7 @@ pub fn run() {
             traceroute_host,
             get_local_ports,
             check_port_connectivity,
+            check_tool_availability,
             list_models
         ])
         .run(tauri::generate_context!())

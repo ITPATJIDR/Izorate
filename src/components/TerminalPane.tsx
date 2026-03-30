@@ -19,7 +19,7 @@ export function TerminalPane({ session }: Props) {
 	const [refreshKey, setRefreshKey] = useState(0);
 	const [isRecording, setIsRecording] = useState(false);
 	const [fontSize, setFontSize] = useState(14);
-	const [fontColor, setFontColor] = useState("#00ff41");
+	const [fontColor, setFontColor] = useState("var(--accent-primary)");
 
 	useEffect(() => {
 		invoke<string | null>("get_izorate_setting", { key: "terminal_font_color" })
@@ -268,14 +268,14 @@ export function TerminalPane({ session }: Props) {
 	};
 
 	return (
-		<div className="flex-1 flex flex-col bg-[#0a0a0a]">
+		<div className="flex-1 flex flex-col bg-[var(--bg-base)]">
 			{/* Header */}
-			<div className="flex items-center justify-between px-4 py-2 border-b" style={{ borderColor: "#00ff4120", background: "#0d0d0d" }}>
+			<div className="flex items-center justify-between px-4 py-2 border-b" style={{ borderColor: "var(--border-focus)", background: "#0d0d0d" }}>
 				<div className="flex items-center gap-2">
 					<span className="text-sm font-semibold crt-glow" style={{ color: fontColor }}>
 						{session.name}
 					</span>
-					<span className="text-xs" style={{ color: "#4a6e4a" }}>
+					<span className="text-xs" style={{ color: "var(--text-muted)" }}>
 						{session.username}@{session.host}:{session.port || 22}
 					</span>
 				</div>

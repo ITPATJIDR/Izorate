@@ -114,13 +114,13 @@ export function TracerouteGraph({ rawResults }: TracerouteGraphProps) {
 	}, [draggingNode]);
 
 	const getLatencyColor = (ms: number) => {
-		if (ms < 50) return "#00ff41";
+		if (ms < 50) return "var(--accent-primary)";
 		if (ms < 150) return "#ffb000";
-		return "#ff2d55";
+		return "var(--red)";
 	};
 
 	return (
-		<div className="flex-1 min-h-[500px] relative bg-black/40 rounded-lg border border-[#00ff4110] overflow-hidden p-6 select-none cursor-default">
+		<div className="flex-1 min-h-[500px] relative bg-black/40 rounded-lg border border-[var(--bg-hover)] overflow-hidden p-6 select-none cursor-default">
 			<div className="absolute inset-0 pointer-events-none opacity-5 shadow-[inset_0_0_100px_rgba(0,255,65,0.2)]" />
 
 			<div className="relative z-10 w-full h-full flex flex-col items-center">
@@ -137,7 +137,7 @@ export function TracerouteGraph({ rawResults }: TracerouteGraphProps) {
 				>
 					<defs>
 						<marker id="arrowhead" markerWidth="10" markerHeight="7" refX="19" refY="3.5" orient="auto">
-							<polygon points="0 0, 10 3.5, 0 7" fill="#4a6e4a" />
+							<polygon points="0 0, 10 3.5, 0 7" fill="var(--text-muted)" />
 						</marker>
 						<filter id="glow">
 							<feGaussianBlur stdDeviation="2.5" result="coloredBlur" />
@@ -208,7 +208,7 @@ export function TracerouteGraph({ rawResults }: TracerouteGraphProps) {
 									<text
 										x="-110"
 										y="5"
-										fill={hop.isLoop ? "#ff00ff" : (hop.isTimeout ? "#4a6e4a" : "#00ff41")}
+										fill={hop.isLoop ? "#ff00ff" : (hop.isTimeout ? "var(--text-muted)" : "var(--accent-primary)")}
 										className="text-[10px] font-mono font-bold"
 									>
 										{hop.index}
@@ -218,7 +218,7 @@ export function TracerouteGraph({ rawResults }: TracerouteGraphProps) {
 										x="0"
 										y="5"
 										textAnchor="middle"
-										fill={hop.isTimeout ? "#4a6e4a" : (hop.isLoop ? "#ffb0ff" : "#ccc")}
+										fill={hop.isTimeout ? "var(--text-muted)" : (hop.isLoop ? "#ffb0ff" : "var(--text-main)")}
 										className="text-[11px] font-mono font-bold"
 									>
 										{hop.ip} {hop.isLoop && "[LOOP!]"}

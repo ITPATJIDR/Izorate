@@ -55,13 +55,13 @@ export function AIPage({ activeChatId, onSelectChat }: AIPageProps) {
 		<div className="flex-1 flex flex-col p-6 overflow-hidden">
 			<div className="flex justify-between items-center mb-6">
 				<div>
-					<h1 className="text-2xl font-bold tracking-tighter crt-glow" style={{ color: "#00ff41" }}>AI ASSISTANT</h1>
+					<h1 className="text-2xl font-bold tracking-tighter crt-glow" style={{ color: "var(--accent-primary)" }}>AI ASSISTANT</h1>
 					<p className="text-xs mt-1" style={{ color: "#4a8a4a" }}>Manage your persistent conversations and insights.</p>
 				</div>
 				<button
 					onClick={handleNewChat}
-					className="px-4 py-2 text-xs font-bold border transition-all hover:bg-[#00ff4110]"
-					style={{ borderColor: "#00ff4140", color: "#00ff41" }}
+					className="px-4 py-2 text-xs font-bold border transition-all hover:bg-[var(--bg-hover)]"
+					style={{ borderColor: "var(--border-focus)", color: "var(--accent-primary)" }}
 				>
 					+ NEW CONVERSATION
 				</button>
@@ -69,7 +69,7 @@ export function AIPage({ activeChatId, onSelectChat }: AIPageProps) {
 
 			<div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
 				{loading ? (
-					<div className="text-xs animate-pulse" style={{ color: "#00ff4140" }}>Loading conversations...</div>
+					<div className="text-xs animate-pulse" style={{ color: "var(--accent-primary)40" }}>Loading conversations...</div>
 				) : chats.length === 0 ? (
 					<div className="h-full flex flex-col items-center justify-center opacity-30 select-none">
 						<div className="text-4xl mb-4">⬡</div>
@@ -81,14 +81,14 @@ export function AIPage({ activeChatId, onSelectChat }: AIPageProps) {
 							<div
 								key={chat.id}
 								onClick={() => onSelectChat(chat.id!)}
-								className={`p-4 border cursor-pointer transition-all hover:translate-y-[-2px] ${activeChatId === chat.id ? 'bg-[#00ff4108]' : 'bg-black/20'}`}
+								className={`p-4 border cursor-pointer transition-all hover:translate-y-[-2px] ${activeChatId === chat.id ? 'bg-[var(--bg-hover)]' : 'bg-black/20'}`}
 								style={{
-									borderColor: activeChatId === chat.id ? "#00ff4160" : "#00ff4115",
-									boxShadow: activeChatId === chat.id ? "0 0 15px #00ff4110" : "none"
+									borderColor: activeChatId === chat.id ? "var(--accent-primary)60" : "var(--accent-primary)15",
+									boxShadow: activeChatId === chat.id ? "0 0 15px var(--accent-primary)10" : "none"
 								}}
 							>
 								<div className="flex justify-between items-start mb-2">
-									<h3 className="text-sm font-bold truncate pr-4" style={{ color: activeChatId === chat.id ? "#00ff41" : "#a0d4a0" }}>
+									<h3 className="text-sm font-bold truncate pr-4" style={{ color: activeChatId === chat.id ? "var(--accent-primary)" : "#a0d4a0" }}>
 										{chat.title}
 									</h3>
 									<button
@@ -99,7 +99,7 @@ export function AIPage({ activeChatId, onSelectChat }: AIPageProps) {
 									</button>
 								</div>
 								<div className="flex items-center gap-2 mt-4">
-									<span className="text-[10px]" style={{ color: "#4a6e4a" }}>
+									<span className="text-[10px]" style={{ color: "var(--text-muted)" }}>
 										{new Date(chat.created_at).toLocaleString()}
 									</span>
 								</div>

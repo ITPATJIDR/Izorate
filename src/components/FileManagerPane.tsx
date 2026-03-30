@@ -65,7 +65,11 @@ export function FileManagerPane({ session }: Props) {
 
 				setLoading(true);
 				for (const path of event.payload.paths) {
-					const filename = path.split(/[/\\]/).pop();
+					// Handle Windows UNC paths like \\?\C:\ or \\.\
+					const cleanPath = path.replace(/^\\\\(\?|\.)\\[a-zA-Z]:\\/, '');
+					// Extract the filename handling both / and \
+					const filename = cleanPath.split(/[/\\]/).pop();
+
 					if (!filename) continue;
 					const remotePath = currentPath + (currentPath.endsWith('/') ? '' : '/') + filename;
 					try {
@@ -102,14 +106,14 @@ export function FileManagerPane({ session }: Props) {
 	};
 
 	return (
-		<div className="flex-1 flex flex-col bg-[#0a0a0a] text-xs relative overflow-hidden min-h-0">
+		<div className="flex-1 flex flex-col bg-[var(--bg-base)] text-xs relative overflow-hidden min-h-0">
 			{/* Toolbar / Breadcrumbs */}
-			<div className="flex items-center gap-2 px-4 py-2 border-b" style={{ borderColor: "#00ff4120", background: "#0d0d0d" }}>
+			<div className="flex items-center gap-2 px-4 py-2 border-b" style={{ borderColor: "var(--border-focus)", background: "#0d0d0d" }}>
 				<button
 					onClick={goUp}
 					disabled={currentPath === '/'}
-					className="px-2 py-1 rounded transition-colors disabled:opacity-50 hover:bg-[#00ff4120]"
-					style={{ color: "#00ff41", border: "1px solid #00ff4140" }}
+					className="px-2 py-1 rounded transition-colors disabled:opacity-50 hover:bg-[var(--border-focus)]"
+					style={{ color: "var(--accent-primary)", border: "1px solid var(--accent-primary)40" }}
 				>
 					↑ Up
 				</button>
@@ -121,15 +125,15 @@ export function FileManagerPane({ session }: Props) {
 				/>
 				<button
 					onClick={() => loadPath(currentPath)}
-					className="px-2 py-1 rounded transition-colors hover:bg-[#00ff4120]"
-					style={{ color: "#00ff41", border: "1px solid #00ff4140" }}
+					className="px-2 py-1 rounded transition-colors hover:bg-[var(--border-focus)]"
+					style={{ color: "var(--accent-primary)", border: "1px solid var(--accent-primary)40" }}
 				>
 					↻ Refresh
 				</button>
 			</div>
 
 			{error && (
-				<div className="p-2 m-2 rounded" style={{ background: "#2a0a0a", border: "1px solid #ff2d5530", color: "#ff6b6b" }}>
+				<div className="p-2 m-2 rounded" style={{ background: "#2a0a0a", border: "1px solid var(--red)30", color: "#ff6b6b" }}>
 					{error}
 				</div>
 			)}
@@ -137,28 +141,28 @@ export function FileManagerPane({ session }: Props) {
 			{/* File List Grid */}
 			<div className="flex-1 overflow-y-auto p-2" style={{ fontFamily: "inherit" }}>
 				<table className="w-full text-left border-collapse">
-					<thead className="sticky top-0 bg-[#0a0a0a] z-10 shadow-sm shadow-[#0a0a0a]">
+					<thead className="sticky top-0 bg-[var(--bg-base)] z-10 shadow-sm shadow-[#0a0a0a]">
 						<tr>
-							<th className="p-2 font-semibold border-b" style={{ borderColor: "#00ff4115", color: "#4a8a4a" }}>Name</th>
-							<th className="p-2 font-semibold border-b w-24" style={{ borderColor: "#00ff4115", color: "#4a8a4a" }}>Size</th>
-							<th className="p-2 font-semibold border-b w-32" style={{ borderColor: "#00ff4115", color: "#4a8a4a" }}>Modified</th>
+							<th className="p-2 font-semibold border-b" style={{ borderColor: "var(--border-focus)", color: "#4a8a4a" }}>Name</th>
+							<th className="p-2 font-semibold border-b w-24" style={{ borderColor: "var(--border-focus)", color: "#4a8a4a" }}>Size</th>
+							<th className="p-2 font-semibold border-b w-32" style={{ borderColor: "var(--border-focus)", color: "#4a8a4a" }}>Modified</th>
 						</tr>
 					</thead>
 					<tbody style={{ opacity: loading ? 0.5 : 1 }}>
 						{files.map(f => (
 							<tr
 								key={f.name}
-								className="hover:bg-[#00ff4110] transition-colors cursor-pointer group"
+								className="hover:bg-[var(--bg-hover)] transition-colors cursor-pointer group"
 								onDoubleClick={() => handleDoubleClick(f)}
 							>
-								<td className="p-2 border-b flex items-center gap-2" style={{ borderColor: "#00ff410a", color: f.is_dir ? "#00e5ff" : "#ccc" }}>
+								<td className="p-2 border-b flex items-center gap-2" style={{ borderColor: "var(--bg-hover)", color: f.is_dir ? "#00e5ff" : "var(--text-main)" }}>
 									<span>{f.is_dir ? "📁" : "📄"}</span>
 									{f.name}
 								</td>
-								<td className="p-2 border-b" style={{ borderColor: "#00ff410a", color: "#888" }}>
+								<td className="p-2 border-b" style={{ borderColor: "var(--bg-hover)", color: "var(--text-muted)" }}>
 									{f.is_dir ? "--" : formatBytes(f.size)}
 								</td>
-								<td className="p-2 border-b" style={{ borderColor: "#00ff410a", color: "#888" }}>
+								<td className="p-2 border-b" style={{ borderColor: "var(--bg-hover)", color: "var(--text-muted)" }}>
 									{new Date(f.modified * 1000).toLocaleString()}
 								</td>
 							</tr>
@@ -176,10 +180,10 @@ export function FileManagerPane({ session }: Props) {
 			{isDragging && (
 				<div
 					className="absolute inset-0 flex items-center justify-center pointer-events-none"
-					style={{ background: "rgba(0, 255, 65, 0.1)", backdropFilter: "blur(2px)", border: "2px dashed #00ff41" }}
+					style={{ background: "var(--accent-glow)", backdropFilter: "blur(2px)", border: "2px dashed var(--accent-primary)" }}
 				>
-					<div className="bg-[#0a0a0a] px-6 py-4 rounded-lg shadow-2xl border" style={{ borderColor: "#00ff41" }}>
-						<h2 className="text-lg font-bold crt-glow" style={{ color: "#00ff41" }}>Drop files to upload via SFTP</h2>
+					<div className="bg-[var(--bg-base)] px-6 py-4 rounded-lg shadow-2xl border" style={{ borderColor: "var(--accent-primary)" }}>
+						<h2 className="text-lg font-bold crt-glow" style={{ color: "var(--accent-primary)" }}>Drop files to upload via SFTP</h2>
 						<p style={{ color: "#4a8a4a" }}>Files will be saved to: {currentPath}</p>
 					</div>
 				</div>

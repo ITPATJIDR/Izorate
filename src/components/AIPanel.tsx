@@ -22,8 +22,8 @@ const CopyButton = ({ code }: { code: string }) => {
 		<button
 			onClick={handleCopy}
 			className={`text-[9px] px-2 py-1 rounded border transition-all uppercase font-bold backdrop-blur-sm ${copied
-				? "bg-[#00ff4140] text-[#00ff41] border-[#00ff41]"
-				: "bg-[#00ff4110] hover:bg-[#00ff4130] text-[#00ff4180] hover:text-[#00ff41] border-[#00ff4120]"
+				? "bg-[var(--border-focus)] text-[var(--accent-primary)] border-[var(--accent-primary)]"
+				: "bg-[var(--bg-hover)] hover:bg-[var(--border-focus)] text-text-emerald-500/80 hover:text-[var(--accent-primary)] border-[var(--border-focus)]"
 				}`}
 		>
 			{copied ? "Copied!" : "Copy"}
@@ -55,7 +55,7 @@ const MarkdownRenderer = memo(({ content }: { content: string }) => {
 										padding: "1rem",
 										fontSize: "11px",
 										background: "#050505",
-										border: "1px solid #00ff4115",
+										border: "1px solid var(--accent-primary)15",
 										borderRadius: "4px"
 									}}
 									{...props}
@@ -257,17 +257,17 @@ export const AIPanel = memo(({ width = 280, activeChatId, onToggleCollapse }: AI
 	if (width <= 0) return null;
 
 	return (
-		<div className="flex flex-col h-full shrink-0" style={{ width: `${width}px`, background: "#0a0a0a", borderLeft: "1px solid #00ff4115" }}>
+		<div className="flex flex-col h-full shrink-0" style={{ width: `${width}px`, background: "#0a0a0a", borderLeft: "1px solid var(--accent-primary)15" }}>
 			{/* Header */}
-			<div className="px-3 py-2 border-b flex items-center gap-2" style={{ borderColor: "#00ff4115", background: "#0d0d0d" }}>
+			<div className="px-3 py-2 border-b flex items-center gap-2" style={{ borderColor: "var(--border-focus)", background: "#0d0d0d" }}>
 				<button
 					onClick={onToggleCollapse}
-					className="text-[#4a6e4a] hover:text-[#00ff41] transition-colors p-0.5"
+					className="text-[var(--text-muted)] hover:text-[var(--accent-primary)] transition-colors p-0.5"
 					title="Collapse AI Panel"
 				>
 					<span className="text-[10px]">»»</span>
 				</button>
-				<span className={`text-[10px] uppercase font-bold tracking-widest ${isGenerating ? 'ai-shimmer' : 'text-[#00ff4180]'}`}>
+				<span className={`text-[10px] uppercase font-bold tracking-widest ${isGenerating ? 'ai-shimmer' : 'text-text-emerald-500/80'}`}>
 					⬡ AI Assistant
 				</span>
 				{(activeChatId && (isGenerating || !hasApiKey)) && (
@@ -295,15 +295,15 @@ export const AIPanel = memo(({ width = 280, activeChatId, onToggleCollapse }: AI
 					{/* Chat History */}
 					<div ref={scrollRef} className="flex-1 overflow-y-auto p-3 flex flex-col gap-3 custom-scrollbar">
 						{loading ? (
-							<div className="text-[10px] animate-pulse" style={{ color: "#00ff4140" }}>Recalling history...</div>
+							<div className="text-[10px] animate-pulse" style={{ color: "var(--accent-primary)40" }}>Recalling history...</div>
 						) : messages.length === 0 ? (
-							<div className="text-[10px] italic text-center py-4" style={{ color: "#4a6e4a" }}>Start a conversation with Izorate AI.</div>
+							<div className="text-[10px] italic text-center py-4" style={{ color: "var(--text-muted)" }}>Start a conversation with Izorate AI.</div>
 						) : (
 							messages.map((msg, i) => (
 								<div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
 									<div className="max-w-[90%] text-xs p-2 rounded leading-relaxed border"
 										style={msg.role === "ai"
-											? { background: "#0f1a0f", borderColor: "#00ff4125", color: "#a0d4a0" }
+											? { background: "#0f1a0f", borderColor: "var(--accent-primary)25", color: "#a0d4a0" }
 											: { background: "#0a1a2a", borderColor: "#00e5ff25", color: "#a0d8e8" }
 										}>
 										<div className="flex justify-between items-center mb-1 opacity-40">
@@ -320,7 +320,7 @@ export const AIPanel = memo(({ width = 280, activeChatId, onToggleCollapse }: AI
 						)}
 						{isGenerating && (
 							<div className="flex justify-start">
-								<div className="max-w-[90%] text-[10px] p-2 rounded italic opacity-50 border border-dashed border-[#00ff4120]" style={{ color: "#00ff41" }}>
+								<div className="max-w-[90%] text-[10px] p-2 rounded italic opacity-50 border border-dashed border-[var(--border-focus)]" style={{ color: "var(--accent-primary)" }}>
 									AI is typing...
 								</div>
 							</div>
@@ -328,7 +328,7 @@ export const AIPanel = memo(({ width = 280, activeChatId, onToggleCollapse }: AI
 					</div>
 
 					{/* Input */}
-					<div className="p-2 border-t" style={{ borderColor: "#00ff4115" }}>
+					<div className="p-2 border-t" style={{ borderColor: "var(--border-focus)" }}>
 						{!hasApiKey ? (
 							<div className="p-3 text-center">
 								<p className="text-[10px] text-red-400 mb-2">API Key required to chat.</p>
@@ -345,13 +345,13 @@ export const AIPanel = memo(({ width = 280, activeChatId, onToggleCollapse }: AI
 									{contexts.map(ctx => (
 										<div
 											key={ctx.id}
-											className="flex items-center gap-1.5 px-2 py-0.5 rounded border border-[#00ff4140] bg-[#00ff4108] text-[#00ff41] text-[9px] uppercase font-bold tracking-tight crt-glow group"
+											className="flex items-center gap-1.5 px-2 py-0.5 rounded border border-[var(--border-focus)] bg-[var(--bg-hover)] text-[var(--accent-primary)] text-[9px] uppercase font-bold tracking-tight crt-glow group"
 										>
-											<span className="opacity-60 text-[7px] text-[#4a6e4a]">Terminal:</span>
+											<span className="opacity-60 text-[7px] text-[var(--text-muted)]">Terminal:</span>
 											<span>{ctx.sessionName}</span>
 											<button
 												onClick={() => removeContext(ctx.id)}
-												className="ml-1 text-[#4a6e4a] hover:text-red-400 transition-colors"
+												className="ml-1 text-[var(--text-muted)] hover:text-red-400 transition-colors"
 												title="Remove Context"
 											>
 												✕
@@ -362,28 +362,28 @@ export const AIPanel = memo(({ width = 280, activeChatId, onToggleCollapse }: AI
 
 								<div className="flex items-center justify-between px-1">
 									<div className="flex items-center gap-1.5">
-										<span className="text-[8px] text-[#4a6e4a] uppercase font-bold tracking-tighter">Model:</span>
+										<span className="text-[8px] text-[var(--text-muted)] uppercase font-bold tracking-tighter">Model:</span>
 										<select
 											value={currentModel}
 											onChange={(e) => handleModelChange(e.target.value)}
 											disabled={loadingModels}
-											className="bg-transparent text-[9px] text-[#00ff41] outline-none cursor-pointer border-none p-0 uppercase font-mono hover:text-cyan-400 transition-colors disabled:opacity-30"
+											className="bg-transparent text-[9px] text-[var(--accent-primary)] outline-none cursor-pointer border-none p-0 uppercase font-mono hover:text-cyan-400 transition-colors disabled:opacity-30"
 										>
 											{loadingModels ? (
 												<option>Loading...</option>
 											) : availableModels.length > 0 ? (
 												availableModels.map(m => (
-													<option key={m} value={m} className="bg-[#0d0d0d]">{m}</option>
+													<option key={m} value={m} className="bg-[var(--bg-surface)]">{m}</option>
 												))
 											) : (
 												<option value="">{currentProvider === "Anthropic" ? "standard" : "No models"}</option>
 											)}
 										</select>
 									</div>
-									<span className="text-[8px] text-[#4a6e4a] uppercase font-bold">{currentProvider}</span>
+									<span className="text-[8px] text-[var(--text-muted)] uppercase font-bold">{currentProvider}</span>
 								</div>
 
-								<div className="flex items-start gap-2 p-2 rounded" style={{ background: "#0f1a0f", border: "1px solid #00ff4130" }}>
+								<div className="flex items-start gap-2 p-2 rounded" style={{ background: "#0f1a0f", border: "1px solid var(--accent-primary)30" }}>
 									<textarea
 										ref={inputRef}
 										value={question}
@@ -396,14 +396,14 @@ export const AIPanel = memo(({ width = 280, activeChatId, onToggleCollapse }: AI
 										}}
 										disabled={isGenerating}
 										className="flex-1 bg-transparent outline-none text-xs placeholder-emerald-900 disabled:opacity-30 resize-none custom-scrollbar"
-										style={{ color: "#00ff41", fontFamily: "inherit", minHeight: "20px", height: "auto", overflowY: "auto" }}
+										style={{ color: "var(--accent-primary)", fontFamily: "inherit", minHeight: "20px", height: "auto", overflowY: "auto" }}
 										placeholder={isGenerating ? "AI is thinking..." : "ask AI anything... (Shift+Enter for newline)"}
 									/>
 									<button
 										disabled={isGenerating || (!question.trim() && contexts.length === 0)}
 										onClick={handleSend}
 										className="mt-0.5 text-xs transition-colors hover:text-green-300 disabled:opacity-20 flex-shrink-0"
-										style={{ color: "#00ff41" }}
+										style={{ color: "var(--accent-primary)" }}
 									>
 										⏎
 									</button>

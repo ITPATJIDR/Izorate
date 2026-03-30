@@ -86,16 +86,16 @@ export function KeysPane() {
 	};
 
 	return (
-		<div className="flex-1 flex flex-col bg-[#0a0a0a] overflow-hidden">
+		<div className="flex-1 flex flex-col bg-[var(--bg-base)] overflow-hidden">
 			<div className="p-6 md:p-8 max-w-5xl w-full mx-auto">
 				<div className="mb-8 flex justify-between items-end">
 					<div>
-						<h2 className="text-2xl font-bold text-[#00ff41] crt-glow mb-1 uppercase tracking-tighter">Credential Vault</h2>
-						<p className="text-xs text-[#4a6e4a]">Manage reusable SSH keys and passwords for your connections.</p>
+						<h2 className="text-2xl font-bold text-[var(--accent-primary)] crt-glow mb-1 uppercase tracking-tighter">Credential Vault</h2>
+						<p className="text-xs text-[var(--text-muted)]">Manage reusable SSH keys and passwords for your connections.</p>
 					</div>
 					<button
 						onClick={() => handleOpenModal()}
-						className="px-4 py-2 bg-[#00ff41] text-black text-xs font-bold rounded hover:bg-[#00cc33] active:scale-95 transition-all shadow-[0_0_15px_rgba(0,255,65,0.2)] uppercase"
+						className="px-4 py-2 bg-[var(--accent-primary)] text-black text-xs font-bold rounded hover:bg-emerald-600 active:scale-95 transition-all shadow-[var(--accent-glow)] uppercase"
 					>
 						+ Add New Key
 					</button>
@@ -103,7 +103,7 @@ export function KeysPane() {
 
 				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
 					{credentials.length === 0 ? (
-						<div className="col-span-full py-12 border border-dashed border-[#4a6e4a30] rounded-lg flex flex-col items-center justify-center text-[#4a6e4a]">
+						<div className="col-span-full py-12 border border-dashed border-[#4a6e4a30] rounded-lg flex flex-col items-center justify-center text-[var(--text-muted)]">
 							<span className="text-4xl mb-4">🔐</span>
 							<p className="text-sm italic">No credentials saved yet.</p>
 						</div>
@@ -111,7 +111,7 @@ export function KeysPane() {
 						credentials.map((cred) => (
 							<div
 								key={cred.id}
-								className="group relative bg-[#0d0d0d] border border-[#00ff4110] hover:border-[#00ff4140] rounded-lg p-4 transition-all hover:bg-[#00ff4105]"
+								className="group relative bg-[var(--bg-surface)] border border-[var(--bg-hover)] hover:border-[var(--border-focus)] rounded-lg p-4 transition-all hover:bg-[var(--bg-hover)]"
 							>
 								<div className="flex items-start justify-between mb-3">
 									<div className="w-10 h-10 rounded bg-[#1a1a1a] flex items-center justify-center text-xl">
@@ -120,33 +120,33 @@ export function KeysPane() {
 									<div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
 										<button
 											onClick={() => handleOpenModal(cred)}
-											className="p-1.5 hover:text-[#00ff41] text-[#4a6e4a]"
+											className="p-1.5 hover:text-[var(--accent-primary)] text-[var(--text-muted)]"
 										>
 											✏️
 										</button>
 										<button
 											onClick={() => cred.id && handleDelete(cred.id)}
-											className="p-1.5 hover:text-red-500 text-[#4a6e4a]"
+											className="p-1.5 hover:text-red-500 text-[var(--text-muted)]"
 										>
 											🗑️
 										</button>
 									</div>
 								</div>
-								<h4 className="text-sm font-bold text-[#ccc] truncate">{cred.name}</h4>
+								<h4 className="text-sm font-bold text-[var(--text-main)] truncate">{cred.name}</h4>
 								<div className="mt-2 space-y-1">
-									<p className="text-[10px] text-[#4a6e4a] uppercase font-bold">Username</p>
-									<p className="text-xs text-[#00ff4180] font-mono">{cred.username}</p>
+									<p className="text-[10px] text-[var(--text-muted)] uppercase font-bold">Username</p>
+									<p className="text-xs text-text-emerald-500/80 font-mono">{cred.username}</p>
 								</div>
 								{cred.password && (
 									<div className="mt-2 space-y-1">
-										<p className="text-[10px] text-[#4a6e4a] uppercase font-bold">Auth Type</p>
-										<p className="text-[10px] text-[#888]">Password Protected</p>
+										<p className="text-[10px] text-[var(--text-muted)] uppercase font-bold">Auth Type</p>
+										<p className="text-[10px] text-[var(--text-muted)]">Password Protected</p>
 									</div>
 								)}
 								{cred.private_key && (
 									<div className="mt-2 space-y-1">
-										<p className="text-[10px] text-[#4a6e4a] uppercase font-bold">Auth Type</p>
-										<p className="text-[10px] text-[#888]">SSH Private Key</p>
+										<p className="text-[10px] text-[var(--text-muted)] uppercase font-bold">Auth Type</p>
+										<p className="text-[10px] text-[var(--text-muted)]">SSH Private Key</p>
 									</div>
 								)}
 							</div>
@@ -158,52 +158,52 @@ export function KeysPane() {
 			{/* Add/Edit Modal */}
 			{isModalOpen && (
 				<div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-					<div className="w-full max-w-md bg-[#0d0d0d] border border-[#00ff4130] rounded-lg shadow-2xl overflow-hidden">
-						<div className="px-6 py-4 border-b border-[#00ff4110] bg-[#0f1a0f] flex items-center justify-between">
-							<h3 className="text-sm font-bold text-[#00ff41] crt-glow uppercase tracking-widest">
+					<div className="w-full max-w-md bg-[var(--bg-surface)] border border-[var(--border-focus)] rounded-lg shadow-2xl overflow-hidden">
+						<div className="px-6 py-4 border-b border-[var(--bg-hover)] bg-[#0f1a0f] flex items-center justify-between">
+							<h3 className="text-sm font-bold text-[var(--accent-primary)] crt-glow uppercase tracking-widest">
 								{editingCred ? "Edit Credential" : "New Credential"}
 							</h3>
-							<button onClick={() => setIsModalOpen(false)} className="text-[#4a6e4a] hover:text-[#00ff41]">✕</button>
+							<button onClick={() => setIsModalOpen(false)} className="text-[var(--text-muted)] hover:text-[var(--accent-primary)]">✕</button>
 						</div>
 
 						<div className="p-6 space-y-4">
 							<div className="space-y-1">
-								<label className="text-[10px] font-bold text-[#888] uppercase">Label (Friendly Name)</label>
+								<label className="text-[10px] font-bold text-[var(--text-muted)] uppercase">Label (Friendly Name)</label>
 								<input
 									type="text"
 									value={name}
 									onChange={(e) => setName(e.target.value)}
-									className="w-full bg-black border border-[#4a6e4a40] rounded px-3 py-2 text-sm text-[#ccc] focus:outline-none focus:border-[#00ff41]"
+									className="w-full bg-black border border-[var(--border-focus)] rounded px-3 py-2 text-sm text-[var(--text-main)] focus:outline-none focus:border-[var(--accent-primary)]"
 									placeholder="e.g. Production Web Server"
 								/>
 							</div>
 
 							<div className="space-y-1">
-								<label className="text-[10px] font-bold text-[#888] uppercase">Username</label>
+								<label className="text-[10px] font-bold text-[var(--text-muted)] uppercase">Username</label>
 								<input
 									type="text"
 									value={username}
 									onChange={(e) => setUsername(e.target.value)}
-									className="w-full bg-black border border-[#4a6e4a40] rounded px-3 py-2 text-sm text-[#ccc] focus:outline-none focus:border-[#00ff41]"
+									className="w-full bg-black border border-[var(--border-focus)] rounded px-3 py-2 text-sm text-[var(--text-main)] focus:outline-none focus:border-[var(--accent-primary)]"
 								/>
 							</div>
 
 							<div className="space-y-1">
-								<label className="text-[10px] font-bold text-[#888] uppercase">Password (Optional)</label>
+								<label className="text-[10px] font-bold text-[var(--text-muted)] uppercase">Password (Optional)</label>
 								<input
 									type="password"
 									value={password}
 									onChange={(e) => setPassword(e.target.value)}
-									className="w-full bg-black border border-[#4a6e4a40] rounded px-3 py-2 text-sm text-[#ccc] focus:outline-none focus:border-[#00ff41]"
+									className="w-full bg-black border border-[var(--border-focus)] rounded px-3 py-2 text-sm text-[var(--text-main)] focus:outline-none focus:border-[var(--accent-primary)]"
 								/>
 							</div>
 
 							<div className="space-y-1">
-								<label className="text-[10px] font-bold text-[#888] uppercase">SSH Private Key (Optional)</label>
+								<label className="text-[10px] font-bold text-[var(--text-muted)] uppercase">SSH Private Key (Optional)</label>
 								<textarea
 									value={privateKey}
 									onChange={(e) => setPrivateKey(e.target.value)}
-									className="w-full h-24 bg-black border border-[#4a6e4a40] rounded px-3 py-2 text-[10px] font-mono text-[#ccc] focus:outline-none focus:border-[#00ff41] resize-none"
+									className="w-full h-24 bg-black border border-[var(--border-focus)] rounded px-3 py-2 text-[10px] font-mono text-[var(--text-main)] focus:outline-none focus:border-[var(--accent-primary)] resize-none"
 									placeholder="-----BEGIN RSA PRIVATE KEY-----"
 								/>
 							</div>
@@ -215,7 +215,7 @@ export function KeysPane() {
 										type="password"
 										value={passphrase}
 										onChange={(e) => setPassphrase(e.target.value)}
-										className="w-full bg-black border border-[#ffa50040] rounded px-3 py-2 text-sm text-[#ccc] focus:outline-none focus:border-[#ffa500]"
+										className="w-full bg-black border border-[#ffa50040] rounded px-3 py-2 text-sm text-[var(--text-main)] focus:outline-none focus:border-[#ffa500]"
 									/>
 								</div>
 							)}
@@ -224,13 +224,13 @@ export function KeysPane() {
 						<div className="px-6 py-4 bg-black/40 flex justify-end gap-3">
 							<button
 								onClick={() => setIsModalOpen(false)}
-								className="px-4 py-2 text-xs text-[#4a6e4a] hover:text-[#00ff41] uppercase font-bold"
+								className="px-4 py-2 text-xs text-[var(--text-muted)] hover:text-[var(--accent-primary)] uppercase font-bold"
 							>
 								Cancel
 							</button>
 							<button
 								onClick={handleSave}
-								className="px-6 py-2 bg-[#00ff41] text-black text-xs font-bold rounded hover:bg-[#00cc33] active:scale-95 transition-all shadow-[0_0_15px_rgba(0,255,65,0.2)] uppercase"
+								className="px-6 py-2 bg-[var(--accent-primary)] text-black text-xs font-bold rounded hover:bg-emerald-600 active:scale-95 transition-all shadow-[var(--accent-glow)] uppercase"
 							>
 								Save Credential
 							</button>

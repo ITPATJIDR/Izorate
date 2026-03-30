@@ -13,7 +13,7 @@ interface TabBarProps {
 export function TabBar({ sessions, activeId, openTabIds, onSelect, onClose, onNew }: TabBarProps) {
 	const openTabs = openTabIds.map(id => sessions.find(s => s.id === id)).filter(Boolean) as Session[];
 	return (
-		<div className="flex items-end gap-0 px-2 border-b overflow-x-auto" style={{ background: "#0a0a0a", borderColor: "#00ff4115" }}>
+		<div className="flex items-end gap-0 px-2 border-b overflow-x-auto" style={{ background: "#0a0a0a", borderColor: "var(--border-focus)" }}>
 			{openTabs.map(s => (
 				<button
 					key={s.id}
@@ -24,8 +24,8 @@ export function TabBar({ sessions, activeId, openTabIds, onSelect, onClose, onNe
 						borderLeft: "1px solid transparent",
 						borderRight: "1px solid transparent",
 						...(s.id === activeId
-							? { borderColor: "#00ff4130", borderBottom: "none", color: "#00ff41", background: "#050a05" }
-							: { color: "#4a6e4a" }
+							? { borderColor: "var(--border-focus)", borderBottom: "none", color: "var(--accent-primary)", background: "#050a05" }
+							: { color: "var(--text-muted)" }
 						),
 					}}>
 					<div className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[s.status]}`} />
@@ -38,7 +38,7 @@ export function TabBar({ sessions, activeId, openTabIds, onSelect, onClose, onNe
 					</span>
 				</button>
 			))}
-			<button onClick={onNew} className="px-3 py-2 text-xs transition-colors ml-1" style={{ color: "#4a6e4a" }}>+ New</button>
+			<button onClick={onNew} className="px-3 py-2 text-xs transition-colors ml-1" style={{ color: "var(--text-muted)" }}>+ New</button>
 		</div>
 	);
 }
