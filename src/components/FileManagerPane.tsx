@@ -8,6 +8,9 @@ interface FileInfo {
 	is_dir: boolean;
 	size: number;
 	modified: number;
+	permissions: string;
+	owner: string;
+	group: string;
 }
 
 interface Props {
@@ -57,9 +60,13 @@ export function FileManagerPane({ session }: Props) {
 		let unlistenCancel: (() => void) | undefined;
 
 		const setupListeners = async () => {
-			unlistenHover = await listen('tauri://drag-enter', () => setIsDragging(true));
-			unlistenCancel = await listen('tauri://drag-leave', () => setIsDragging(false));
-			unlistenDrop = await listen<{ paths: string[] }>('tauri://drop', async (event) => {
+			unlistenHover = await listen('tauri://drag-enter', () => {
+				setIsDragging(true);
+			});
+			unlistenCancel = await listen('tauri://drag-leave', () => {
+				setIsDragging(false);
+			});
+			unlistenDrop = await listen<{ paths: string[] }>('tauri://drag-drop', async (event) => {
 				setIsDragging(false);
 				if (!event.payload.paths) return;
 
@@ -144,6 +151,9 @@ export function FileManagerPane({ session }: Props) {
 					<thead className="sticky top-0 bg-[var(--bg-base)] z-10 shadow-sm shadow-[#0a0a0a]">
 						<tr>
 							<th className="p-2 font-semibold border-b" style={{ borderColor: "var(--border-focus)", color: "var(--text-muted)" }}>Name</th>
+							<th className="p-2 font-semibold border-b w-32" style={{ borderColor: "var(--border-focus)", color: "var(--text-muted)" }}>Permissions</th>
+							<th className="p-2 font-semibold border-b w-20" style={{ borderColor: "var(--border-focus)", color: "var(--text-muted)" }}>Owner</th>
+							<th className="p-2 font-semibold border-b w-20" style={{ borderColor: "var(--border-focus)", color: "var(--text-muted)" }}>Group</th>
 							<th className="p-2 font-semibold border-b w-24" style={{ borderColor: "var(--border-focus)", color: "var(--text-muted)" }}>Size</th>
 							<th className="p-2 font-semibold border-b w-32" style={{ borderColor: "var(--border-focus)", color: "var(--text-muted)" }}>Modified</th>
 						</tr>
@@ -158,6 +168,15 @@ export function FileManagerPane({ session }: Props) {
 								<td className="p-2 border-b flex items-center gap-2" style={{ borderColor: "var(--bg-card)", color: f.is_dir ? "var(--cyan)" : "var(--text-main)" }}>
 									<span>{f.is_dir ? "📁" : "📄"}</span>
 									{f.name}
+								</td>
+								<td className="p-2 border-b font-mono text-[10px]" style={{ borderColor: "var(--bg-card)", color: "var(--text-muted)" }}>
+									{f.permissions}
+								</td>
+								<td className="p-2 border-b text-[10px]" style={{ borderColor: "var(--bg-card)", color: "var(--text-muted)" }}>
+									{f.owner}
+								</td>
+								<td className="p-2 border-b text-[10px]" style={{ borderColor: "var(--bg-card)", color: "var(--text-muted)" }}>
+									{f.group}
 								</td>
 								<td className="p-2 border-b" style={{ borderColor: "var(--bg-card)", color: "var(--text-muted)" }}>
 									{f.is_dir ? "--" : formatBytes(f.size)}

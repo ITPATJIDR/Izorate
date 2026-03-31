@@ -204,6 +204,24 @@ pub struct FileInfo {
     pub is_dir: bool,
     pub size: u64,
     pub modified: u64,
+    pub permissions: String,
+    pub owner: String,
+    pub group: String,
+}
+
+fn mode_to_string(p: &russh_sftp::protocol::FilePermissions, is_dir: bool) -> String {
+    let mut s = String::with_capacity(10);
+    s.push(if is_dir { 'd' } else { '-' });
+    s.push(if p.owner_read { 'r' } else { '-' });
+    s.push(if p.owner_write { 'w' } else { '-' });
+    s.push(if p.owner_exec { 'x' } else { '-' });
+    s.push(if p.group_read { 'r' } else { '-' });
+    s.push(if p.group_write { 'w' } else { '-' });
+    s.push(if p.group_exec { 'x' } else { '-' });
+    s.push(if p.other_read { 'r' } else { '-' });
+    s.push(if p.other_write { 'w' } else { '-' });
+    s.push(if p.other_exec { 'x' } else { '-' });
+    s
 }
 
 #[tauri::command]
@@ -219,24 +237,32 @@ pub async fn list_sftp_directory(state: tauri::State<'_, SshManager>, id: i64, p
     let mut files = Vec::new();
     for entry in dir {
         let name = entry.file_name();
-        
-        let mut is_dir = false;
-        let mut modified = 0;
-        
-        let file_type = entry.file_type();
-        if file_type.is_dir() {
-            is_dir = true;
-        }
         let meta = entry.metadata();
+        
+        let is_dir = meta.is_dir();
         let size = meta.len();
+        let mut modified = 0;
         
         if let Ok(m) = meta.modified() {
             if let Ok(duration) = m.duration_since(std::time::UNIX_EPOCH) {
                 modified = duration.as_secs();
             }
         }
+
+        let p = meta.permissions();
+        let permissions = mode_to_string(&p, is_dir);
+        let owner = meta.uid.map(|u| u.to_string()).unwrap_or_else(|| "unknown".into());
+        let group = meta.gid.map(|g| g.to_string()).unwrap_or_else(|| "unknown".into());
         
-        files.push(FileInfo { name, is_dir, size, modified });
+        files.push(FileInfo { 
+            name, 
+            is_dir, 
+            size, 
+            modified, 
+            permissions,
+            owner,
+            group
+        });
     }
     
     Ok(files)

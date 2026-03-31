@@ -24,13 +24,32 @@ fn is_binary_available(name: &str) -> bool {
 
 // ───────────────────────── PING ─────────────────────────
 
-/// Try OS binary ping, fallback to TCP-based ping
-pub async fn ping(app: &AppHandle, host: &str, count: u32) -> Result<(), String> {
-    if is_binary_available("ping") {
+/// Implementation mode for network tools
+#[derive(serde::Deserialize, Clone, Copy, PartialEq)]
+pub enum ImplementationMode {
+    #[serde(rename = "auto")]
+    Auto,
+    #[serde(rename = "native")]
+    Native,
+    #[serde(rename = "fallback")]
+    Fallback,
+}
+
+/// Try OS binary ping, fallback to TCP-based ping or respect explicit mode
+pub async fn ping(app: &AppHandle, host: &str, count: u32, mode: ImplementationMode) -> Result<(), String> {
+    let use_native = match mode {
+        ImplementationMode::Native => true,
+        ImplementationMode::Fallback => false,
+        ImplementationMode::Auto => is_binary_available("ping"),
+    };
+
+    if use_native {
         ping_with_binary(app, host, count).await
     } else {
-        app.emit("ping-result", format!("⚠ 'ping' not found — using TCP ping fallback"))
-            .map_err(|e| e.to_string())?;
+        if mode == ImplementationMode::Auto {
+            app.emit("ping-result", format!("⚠ 'ping' not found — using TCP ping fallback"))
+                .map_err(|e| e.to_string())?;
+        }
         ping_tcp_fallback(app, host, count).await
     }
 }
@@ -165,17 +184,26 @@ async fn ping_tcp_fallback(app: &AppHandle, host: &str, count: u32) -> Result<()
 
 // ───────────────────────── TRACEROUTE ─────────────────────────
 
-/// Try OS binary traceroute, fallback to TCP-based traceroute
-pub async fn traceroute(app: &AppHandle, host: &str) -> Result<(), String> {
+/// Try OS binary traceroute, fallback to TCP-based traceroute or respect explicit mode
+pub async fn traceroute(app: &AppHandle, host: &str, mode: ImplementationMode) -> Result<(), String> {
     let bin = if cfg!(windows) { "tracert" } else { "traceroute" };
-    if is_binary_available(bin) {
+    
+    let use_native = match mode {
+        ImplementationMode::Native => true,
+        ImplementationMode::Fallback => false,
+        ImplementationMode::Auto => is_binary_available(bin),
+    };
+
+    if use_native {
         traceroute_with_binary(app, host).await
     } else {
-        app.emit(
-            "traceroute-result",
-            format!("⚠ '{}' not found — using TCP traceroute fallback", bin),
-        )
-        .map_err(|e| e.to_string())?;
+        if mode == ImplementationMode::Auto {
+            app.emit(
+                "traceroute-result",
+                format!("⚠ '{}' not found — using TCP traceroute fallback", bin),
+            )
+            .map_err(|e| e.to_string())?;
+        }
         traceroute_tcp_fallback(app, host).await
     }
 }
@@ -379,15 +407,21 @@ pub fn get_listening_ports() -> Result<Vec<serde_json::Value>, String> {
 // ───────────────────────── TOOL AVAILABILITY ─────────────────────────
 
 /// Returns which tools use native binary vs fallback
-pub fn check_availability() -> serde_json::Value {
+pub async fn check_availability() -> serde_json::Value {
     let trace_bin = if cfg!(windows) { "tracert" } else { "traceroute" };
+    
+    // Perform detection in a separate task to avoid blocking if the OS is slow
+    let (ping_avail, trace_avail) = tokio::task::spawn_blocking(move || {
+        (is_binary_available("ping"), is_binary_available(trace_bin))
+    }).await.unwrap_or((false, false));
+
     serde_json::json!({
         "ping": {
-            "native": is_binary_available("ping"),
+            "native": ping_avail,
             "fallback": "TCP ping"
         },
         "traceroute": {
-            "native": is_binary_available(trace_bin),
+            "native": trace_avail,
             "fallback": "TCP traceroute"
         },
         "ports": {

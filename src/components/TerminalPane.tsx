@@ -66,7 +66,8 @@ export function TerminalPane({ session }: Props) {
 				if (selection) {
 					invoke("emit_terminal_selection", {
 						text: selection,
-						sessionName: session.name
+						sessionName: session.name,
+						sessionId: session.id
 					}).catch(console.error);
 				}
 				return false; // Prevent default

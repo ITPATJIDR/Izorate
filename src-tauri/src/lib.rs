@@ -186,11 +186,30 @@ fn set_izorate_setting(app: AppHandle, key: String, value: String) -> Result<(),
 }
 
 #[tauri::command]
-fn emit_terminal_selection(app: AppHandle, text: String, session_name: String) -> Result<(), String> {
+fn emit_terminal_selection(app: AppHandle, text: String, session_name: String, session_id: i64) -> Result<(), String> {
     app.emit("terminal-selection-to-ai", serde_json::json!({
         "text": text,
-        "sessionName": session_name
+        "sessionName": session_name,
+        "sessionId": session_id
     })).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn get_sanitize_rules(state: tauri::State<'_, DbState>, session_id: i64) -> Result<Vec<db::SanitizeRule>, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    db::get_sanitize_rules(&conn, session_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn add_sanitize_rule(state: tauri::State<'_, DbState>, session_id: i64, pattern: String, replacement: String) -> Result<i64, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    db::add_sanitize_rule(&conn, session_id, &pattern, &replacement).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn delete_sanitize_rule(state: tauri::State<'_, DbState>, id: i64) -> Result<(), String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    db::delete_sanitize_rule(&conn, id).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -201,10 +220,10 @@ fn save_clipboard_history(app: AppHandle, content: String) -> Result<(), String>
 }
 
 #[tauri::command]
-async fn ping_host(app: AppHandle, state: State<'_, DbState>, host: String, count: u32, source_session_id: i64, password: Option<String>) -> Result<(), String> {
+async fn ping_host(app: AppHandle, state: State<'_, DbState>, host: String, count: u32, source_session_id: i64, password: Option<String>, mode: network_tools::ImplementationMode) -> Result<(), String> {
     if source_session_id == -1 {
         // Run locally with hybrid approach (binary → TCP fallback)
-        network_tools::ping(&app, &host, count).await?;
+        network_tools::ping(&app, &host, count, mode).await?;
     } else {
         // Run remotely via SSH (Assume Linux/Unix remote)
         let config = {
@@ -218,10 +237,10 @@ async fn ping_host(app: AppHandle, state: State<'_, DbState>, host: String, coun
 }
 
 #[tauri::command]
-async fn traceroute_host(app: AppHandle, state: State<'_, DbState>, host: String, source_session_id: i64, password: Option<String>) -> Result<(), String> {
+async fn traceroute_host(app: AppHandle, state: State<'_, DbState>, host: String, source_session_id: i64, password: Option<String>, mode: network_tools::ImplementationMode) -> Result<(), String> {
     if source_session_id == -1 {
         // Run locally with hybrid approach (binary → TCP fallback)
-        network_tools::traceroute(&app, &host).await?;
+        network_tools::traceroute(&app, &host, mode).await?;
     } else {
         // Run remotely (Assume Linux/Unix remote)
         let config = {
@@ -387,8 +406,8 @@ async fn list_models(provider: String, api_key: String) -> Result<Vec<String>, S
 }
 
 #[tauri::command]
-fn check_tool_availability() -> serde_json::Value {
-    network_tools::check_availability()
+async fn check_tool_availability() -> serde_json::Value {
+    network_tools::check_availability().await
 }
 
 #[tauri::command]
@@ -458,7 +477,10 @@ pub fn run() {
             get_local_ports,
             check_port_connectivity,
             check_tool_availability,
-            list_models
+            list_models,
+            get_sanitize_rules,
+            add_sanitize_rule,
+            delete_sanitize_rule
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -39,6 +39,14 @@ pub struct Message {
     pub timestamp: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SanitizeRule {
+    pub id: Option<i64>,
+    pub session_id: i64,
+    pub pattern: String,
+    pub replacement: String,
+}
+
 pub fn init_db(conn: &Connection) -> Result<()> {
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS groups (
@@ -86,6 +94,13 @@ pub fn init_db(conn: &Connection) -> Result<()> {
             content   TEXT NOT NULL,
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY(chat_id) REFERENCES chats(id) ON DELETE CASCADE
+        );
+        CREATE TABLE IF NOT EXISTS sanitize_rules (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id  INTEGER NOT NULL,
+            pattern     TEXT NOT NULL,
+            replacement TEXT NOT NULL,
+            FOREIGN KEY(session_id) REFERENCES connections(id) ON DELETE CASCADE
         );",
     )
 }
@@ -276,4 +291,30 @@ pub fn get_messages(conn: &Connection, chat_id: i64) -> Result<Vec<Message>> {
 pub fn add_message(conn: &Connection, chat_id: i64, role: &str, content: &str) -> Result<i64> {
     conn.execute("INSERT INTO messages (chat_id, role, content) VALUES (?1, ?2, ?3)", params![chat_id, role, content])?;
     Ok(conn.last_insert_rowid())
+}
+
+pub fn get_sanitize_rules(conn: &Connection, session_id: i64) -> Result<Vec<SanitizeRule>> {
+    let mut stmt = conn.prepare("SELECT id, session_id, pattern, replacement FROM sanitize_rules WHERE session_id = ?1")?;
+    let rows = stmt.query_map(params![session_id], |row| {
+        Ok(SanitizeRule {
+            id: Some(row.get(0)?),
+            session_id: row.get(1)?,
+            pattern: row.get(2)?,
+            replacement: row.get(3)?,
+        })
+    })?;
+    rows.collect()
+}
+
+pub fn add_sanitize_rule(conn: &Connection, session_id: i64, pattern: &str, replacement: &str) -> Result<i64> {
+    conn.execute(
+        "INSERT INTO sanitize_rules (session_id, pattern, replacement) VALUES (?1, ?2, ?3)",
+        params![session_id, pattern, replacement],
+    )?;
+    Ok(conn.last_insert_rowid())
+}
+
+pub fn delete_sanitize_rule(conn: &Connection, id: i64) -> Result<()> {
+    conn.execute("DELETE FROM sanitize_rules WHERE id = ?1", params![id])?;
+    Ok(())
 }

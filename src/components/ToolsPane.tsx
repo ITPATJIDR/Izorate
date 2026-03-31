@@ -25,6 +25,7 @@ export function ToolsPane({ sessions }: Props) {
 	const [sourceSessionId, setSourceSessionId] = useState<number>(-1); // -1 = Local Machine
 	const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
 	const [pendingAction, setPendingAction] = useState<{ type: string, args: any } | null>(null);
+	const [implementationMode, setImplementationMode] = useState<"auto" | "native" | "fallback">("auto");
 
 	// Tool availability state
 	const [toolAvailability, setToolAvailability] = useState<any>(null);
@@ -89,7 +90,8 @@ export function ToolsPane({ sessions }: Props) {
 					host: args.host,
 					count: 4,
 					sourceSessionId,
-					password: password || null
+					password: password || null,
+					mode: implementationMode
 				});
 			} catch (err) {
 				setResults(prev => [...prev, `Error: ${err}`]);
@@ -103,7 +105,8 @@ export function ToolsPane({ sessions }: Props) {
 				await invoke("traceroute_host", {
 					host: args.host,
 					sourceSessionId,
-					password: password || null
+					password: password || null,
+					mode: implementationMode
 				});
 			} catch (err) {
 				setTraceResults(prev => [...prev, `Error: ${err}`]);
@@ -177,21 +180,8 @@ export function ToolsPane({ sessions }: Props) {
 										activeTool === "Trace" ? "Visualize network hops to a destination." :
 											"This tool is not implemented yet."}
 							</p>
-							{toolAvailability && sourceSessionId === -1 && (() => {
-								const key = activeTool === "Ping" ? "ping" : activeTool === "Trace" ? "traceroute" : "ports";
-								const info = toolAvailability[key];
-								if (!info) return null;
-								const isNative = info.native;
-								return (
-									<span className={`inline-flex items-center gap-1 mt-1.5 text-[10px] px-2 py-0.5 rounded-full border ${isNative ? 'text-text-emerald-500/80 border-[var(--border-focus)] bg-[var(--bg-hover)]' : 'text-[var(--amber)] border-[var(--amber)30] bg-[var(--amber)08]'}`}>
-										<span className="text-[8px]">{isNative ? '●' : '◐'}</span>
-										{isNative ? 'Native' : `Fallback: ${info.fallback}`}
-									</span>
-								);
-							})()}
 						</div>
 
-						{/* Source Selector */}
 						<div className="flex flex-col gap-1.5 min-w-[200px]">
 							<label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">Execute From (Source)</label>
 							<select
@@ -207,6 +197,54 @@ export function ToolsPane({ sessions }: Props) {
 								</optgroup>
 							</select>
 						</div>
+					</div>
+
+					{/* Tool Settings Row */}
+					<div className="mb-6 flex flex-wrap items-center gap-4 p-3 rounded border border-[var(--bg-hover)] bg-[var(--bg-surface)]/30">
+						<div className="flex items-center gap-3">
+							<label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest whitespace-nowrap">Source:</label>
+							<select
+								value={sourceSessionId}
+								onChange={(e) => setSourceSessionId(parseInt(e.target.value))}
+								className="bg-[#0f1a0f] border border-[var(--border-focus)] text-[var(--accent-primary)] text-[10px] rounded px-2 py-1 outline-none focus:border-[var(--accent-primary)] transition-all min-w-[140px]"
+							>
+								<option value="-1">Local Machine</option>
+								<optgroup label="Saved Sessions">
+									{sessions.map(s => (
+										<option key={s.id} value={s.id as unknown as number}>{s.name}</option>
+									))}
+								</optgroup>
+							</select>
+						</div>
+
+						<div className="flex items-center gap-3">
+							<label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest whitespace-nowrap">Mode:</label>
+							<select
+								value={implementationMode}
+								onChange={(e) => setImplementationMode(e.target.value as any)}
+								className="bg-[#0f141a] border border-[var(--border-focus)] text-[var(--cyan)] text-[10px] rounded px-2 py-1 outline-none focus:border-[var(--cyan)] transition-all"
+							>
+								<option value="auto">Auto-detect</option>
+								<option value="native">Force Native (Binary)</option>
+								<option value="fallback">Force Fallback (TCP)</option>
+							</select>
+						</div>
+
+						{toolAvailability && sourceSessionId === -1 && (() => {
+							const key = activeTool === "Ping" ? "ping" : activeTool === "Trace" ? "traceroute" : "ports";
+							const info = toolAvailability[key];
+							if (!info) return null;
+							const isNative = info.native;
+							return (
+								<div className="ml-auto flex items-center gap-2">
+									<span className="text-[9px] text-[var(--text-muted)] uppercase tracking-tighter">Status:</span>
+									<span className={`inline-flex items-center gap-1 text-[9px] px-2 py-0.5 rounded-full border ${isNative ? 'text-emerald-500/80 border-[var(--border-focus)] bg-[var(--bg-hover)]' : 'text-[var(--amber)] border-[var(--amber)30] bg-[var(--amber)08]'}`}>
+										<span className="text-[7px]">{isNative ? '●' : '◐'}</span>
+										{isNative ? 'Native detected' : `Fallback needed: ${info.fallback}`}
+									</span>
+								</div>
+							);
+						})()}
 					</div>
 
 					{activeTool === "Ping" ? (
