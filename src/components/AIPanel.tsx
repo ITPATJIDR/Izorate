@@ -109,6 +109,11 @@ export const AIPanel = memo(({ width = 280, activeChatId, onToggleCollapse }: AI
 		}
 	}, [question]);
 
+	const [modalWidth, setModalWidth] = useState(900);
+	const [modalHeight, setModalHeight] = useState(600);
+	const [isResizingModal, setIsResizingModal] = useState(false);
+	const [isMaximized, setIsMaximized] = useState(false);
+
 	const checkAiStatus = useCallback(async () => {
 		try {
 			const provider = (await invoke<string | null>("get_izorate_setting", { key: "ai_provider" })) || "OpenAI";
@@ -140,6 +145,35 @@ export const AIPanel = memo(({ width = 280, activeChatId, onToggleCollapse }: AI
 			setHasApiKey(false);
 		}
 	}, []);
+
+	const startModalResize = (e: React.MouseEvent) => {
+		e.preventDefault();
+		setIsResizingModal(true);
+	};
+
+	useEffect(() => {
+		const handleMove = (e: MouseEvent) => {
+			if (isResizingModal) {
+				// Get modal container starting point (it's centered)
+				const modalX = (window.innerWidth - modalWidth) / 2;
+				const modalY = (window.innerHeight - modalHeight) / 2;
+				const newWidth = Math.max(600, e.clientX - modalX);
+				const newHeight = Math.max(400, e.clientY - modalY);
+				setModalWidth(newWidth);
+				setModalHeight(newHeight);
+			}
+		};
+		const handleUp = () => setIsResizingModal(false);
+
+		if (isResizingModal) {
+			window.addEventListener("mousemove", handleMove);
+			window.addEventListener("mouseup", handleUp);
+		}
+		return () => {
+			window.removeEventListener("mousemove", handleMove);
+			window.removeEventListener("mouseup", handleUp);
+		};
+	}, [isResizingModal, modalWidth, modalHeight]);
 
 	useEffect(() => {
 		checkAiStatus();
@@ -491,14 +525,26 @@ export const AIPanel = memo(({ width = 280, activeChatId, onToggleCollapse }: AI
 			{/* Sanitize Modal */}
 			{editingContext && (
 				<div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-					<div className="bg-[var(--bg-base)] border border-[var(--border-focus)] rounded-lg shadow-2xl w-full max-w-4xl max-h-[80vh] flex flex-col overflow-hidden">
+					<div
+						className={`bg-[var(--bg-base)] border border-[var(--border-focus)] rounded-lg shadow-2xl flex flex-col overflow-hidden relative ${isMaximized ? "fixed inset-8 w-auto max-w-none max-h-none" : ""}`}
+						style={!isMaximized ? { width: `${modalWidth}px`, height: `${modalHeight}px`, maxWidth: "95vw", maxHeight: "90vh" } : {}}
+					>
 						{/* Modal Header */}
 						<div className="px-4 py-3 border-b flex items-center justify-between bg-[var(--bg-surface)]" style={{ borderColor: "var(--border-focus)" }}>
 							<h3 className="text-sm font-bold uppercase tracking-widest text-[var(--accent-primary)] flex items-center gap-2">
 								<span>🛡️ Sanitized Context</span>
 								<span className="text-[10px] text-[var(--text-muted)] font-normal">Apply rules and edit sensitive info</span>
 							</h3>
-							<button onClick={() => setEditingContext(null)} className="text-[var(--text-muted)] hover:text-white transition-colors">✕</button>
+							<div className="flex items-center gap-4">
+								<button
+									onClick={() => setIsMaximized(!isMaximized)}
+									className="text-[10px] text-[var(--text-muted)] hover:text-[var(--accent-primary)] transition-colors uppercase font-bold tracking-tighter"
+									title={isMaximized ? "Restore" : "Maximize"}
+								>
+									{isMaximized ? "🗗 Restore" : "🗖 Maximize"}
+								</button>
+								<button onClick={() => setEditingContext(null)} className="text-[var(--text-muted)] hover:text-white transition-colors">✕</button>
+							</div>
 						</div>
 
 						{/* Modal Content */}
@@ -592,9 +638,19 @@ export const AIPanel = memo(({ width = 280, activeChatId, onToggleCollapse }: AI
 						</div>
 
 						{/* Modal Footer */}
-						<div className="px-4 py-3 border-t flex items-center justify-end gap-3 bg-[var(--bg-surface)]" style={{ borderColor: "var(--border-focus)" }}>
+						<div className="px-4 py-3 border-t flex items-center justify-end gap-3 bg-[var(--bg-surface)] relative" style={{ borderColor: "var(--border-focus)" }}>
 							<button onClick={() => setEditingContext(null)} className="text-[10px] text-[var(--text-muted)] uppercase font-bold px-4 py-2 hover:bg-[var(--bg-hover)] rounded transition-all">Cancel</button>
 							<button onClick={saveEditedContext} className="bg-[var(--accent-primary)] text-black text-[10px] uppercase font-bold px-6 py-2 rounded hover:shadow-[0_0_15px_var(--accent-primary)] transition-all">Save Context</button>
+
+							{/* Resize Handle */}
+							{!isMaximized && (
+								<div
+									onMouseDown={startModalResize}
+									className="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize flex items-end justify-end p-0.5 group"
+								>
+									<div className="w-2 h-2 border-r-2 border-b-2 border-[var(--text-muted)] group-hover:border-[var(--accent-primary)] transition-colors" />
+								</div>
+							)}
 						</div>
 					</div>
 				</div>

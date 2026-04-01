@@ -2,10 +2,12 @@ interface TopBarProps {
 	connectedCount: number;
 	activeTab: string;
 	hasActiveSession: boolean;
+	isMultiExec: boolean;
 	onTabChange: (tab: string) => void;
+	onToggleMultiExec: () => void;
 }
 
-export function TopBar({ connectedCount, activeTab, hasActiveSession, onTabChange }: TopBarProps) {
+export function TopBar({ connectedCount, activeTab, hasActiveSession, isMultiExec, onTabChange, onToggleMultiExec }: TopBarProps) {
 	const now = new Date();
 	const timeStr = now.toLocaleTimeString("en-US", { hour12: false });
 	const dateStr = now.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
@@ -50,6 +52,23 @@ export function TopBar({ connectedCount, activeTab, hasActiveSession, onTabChang
 
 			{/* Right: Status */}
 			<div className="flex items-center gap-4 text-xs" style={{ color: "var(--text-muted)" }}>
+				{connectedCount > 1 && activeTab === "Sessions" && (
+					<button
+						onClick={onToggleMultiExec}
+						className={`flex items-center gap-1.5 px-2 py-1 rounded border transition-all duration-300 group ${isMultiExec
+							? "bg-amber-500/20 border-amber-500 text-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.4)]"
+							: "bg-[var(--bg-hover)]/40 border-white/5 hover:border-[var(--accent-primary)]/40 hover:text-[var(--accent-primary)]"
+							}`}
+						title="Multi-Execution: Broadcast input to all sessions"
+					>
+						<span className={`${isMultiExec ? "animate-pulse" : "opacity-60"}`}>📡</span>
+						<span className={`uppercase font-bold tracking-tighter ${isMultiExec ? "opacity-100" : "opacity-40"}`}>
+							Multi-Exec {isMultiExec ? "ON" : "OFF"}
+						</span>
+						{isMultiExec && <div className="w-1.5 h-1.5 rounded-full bg-amber-500 pulse-dot ml-0.5" />}
+					</button>
+				)}
+
 				<span>
 					<span style={{ color: "var(--accent-primary)" }}>{connectedCount}</span> connected
 				</span>

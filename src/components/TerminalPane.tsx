@@ -3,14 +3,16 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { listen, emit } from "@tauri-apps/api/event";
 import type { Session } from "../types/session";
 
 interface Props {
 	session: Session;
+	isMultiExec: boolean;
+	isActive: boolean;
 }
 
-export function TerminalPane({ session }: Props) {
+export function TerminalPane({ session, isMultiExec, isActive }: Props) {
 	const terminalRef = useRef<HTMLDivElement>(null);
 	const xtermRef = useRef<Terminal | null>(null);
 	const fitAddonRef = useRef<FitAddon | null>(null);
@@ -20,6 +22,16 @@ export function TerminalPane({ session }: Props) {
 	const [isRecording, setIsRecording] = useState(false);
 	const [fontSize, setFontSize] = useState(14);
 	const [fontColor, setFontColor] = useState("var(--accent-primary)");
+	const isMultiExecRef = useRef(isMultiExec);
+	const isActiveRef = useRef(isActive);
+
+	useEffect(() => {
+		isMultiExecRef.current = isMultiExec;
+	}, [isMultiExec]);
+
+	useEffect(() => {
+		isActiveRef.current = isActive;
+	}, [isActive]);
 
 	useEffect(() => {
 		invoke<string | null>("get_izorate_setting", { key: "terminal_font_color" })
@@ -77,36 +89,64 @@ export function TerminalPane({ session }: Props) {
 
 		term.writeln(`\x1b[32m[Izorate] Connecting to ${session.username}@${session.host}...\x1b[0m`);
 
-		let unlistenOut: (() => void) | undefined;
-		let unlistenConnected: (() => void) | undefined;
-		let unlistenClosed: (() => void) | undefined;
+		let active = true;
+		const unlistenFuncs: Array<() => void> = [];
 
 		// Start connection
 		invoke("connect_ssh", { id: session.id }).catch(err => {
-			term.writeln(`\r\n\x1b[31;1m[Terminal Error]\x1b[0m ${err}`);
-			term.writeln(`\r\n\x1b[33mHint: Make sure the server is reachable and password is correct.\x1b[0m`);
+			if (active) {
+				term.writeln(`\r\n\x1b[31;1m[Terminal Error]\x1b[0m ${err}`);
+				term.writeln(`\r\n\x1b[33mHint: Make sure the server is reachable and password is correct.\x1b[0m`);
+			}
 		});
 
 		const setupListeners = async () => {
-			unlistenOut = await listen<string>(`ssh-out-${session.id}`, (e) => {
-				term.write(e.payload);
+			const u1 = await listen<string>(`ssh-out-${session.id}`, (e) => {
+				if (active) term.write(e.payload);
 			});
-			unlistenConnected = await listen(`ssh-connected-${session.id}`, () => {
+			if (!active) { u1(); return; }
+			unlistenFuncs.push(u1);
+
+			const u2 = await listen(`ssh-connected-${session.id}`, () => {
+				if (!active) return;
 				term.writeln(`\r\n\x1b[32;1m[Connected]\x1b[0m`);
-				// Sync terminal size with remote PTY instantly
 				try {
 					invoke("resize_pty", { id: session.id, cols: term.cols, rows: term.rows }).catch(() => { });
 				} catch (e) { }
 			});
-			unlistenClosed = await listen(`ssh-closed-${session.id}`, () => {
-				term.writeln(`\r\n\x1b[31;1m[Connection Closed by Remote Host]\x1b[0m`);
+			if (!active) { u2(); return; }
+			unlistenFuncs.push(u2);
+
+			const u3 = await listen(`ssh-closed-${session.id}`, () => {
+				if (active) term.writeln(`\r\n\x1b[31;1m[Connection Closed by Remote Host]\x1b[0m`);
 			});
+			if (!active) { u3(); return; }
+			unlistenFuncs.push(u3);
+
+			const u4 = await listen<{ data: string, sourceId: number }>("multi-exec-input", (e) => {
+				// Only process broadcast if we are NOT the active (broadcasting) terminal
+				// AND the mode is on, AND it's not our own broadcast
+				if (active && isMultiExecRef.current && !isActiveRef.current && e.payload.sourceId !== session.id) {
+					invoke("write_pty", { id: session.id, data: e.payload.data }).catch(() => { });
+				}
+			});
+			if (!active) { u4(); return; }
+			unlistenFuncs.push(u4);
 		};
 		setupListeners();
 
 		// Send input from user typing
 		const onDataDisp = term.onData(data => {
+			// If Multi-Exec is ON, only the active (focused) terminal handles keyboard input
+			// Non-focused terminals will receive the data via the broadcast listener
+			if (isMultiExecRef.current && !isActiveRef.current) return;
+
 			invoke("write_pty", { id: session.id, data }).catch(console.error);
+
+			// Broadcast input to others if Multi-Exec is active
+			if (isMultiExecRef.current && isActiveRef.current) {
+				emit("multi-exec-input", { data, sourceId: session.id }).catch(() => { });
+			}
 		});
 
 		// Handle resize
@@ -185,6 +225,9 @@ export function TerminalPane({ session }: Props) {
 		}
 
 		return () => {
+			active = false;
+			unlistenFuncs.forEach(u => u());
+
 			window.removeEventListener("resize", handleWindowResize);
 			if (resizeObserver) resizeObserver.disconnect();
 			if (terminalEl) {
@@ -196,9 +239,6 @@ export function TerminalPane({ session }: Props) {
 			onResizeDisp.dispose();
 			onSelectionDisp.dispose();
 			term.dispose();
-			if (unlistenOut) unlistenOut();
-			if (unlistenConnected) unlistenConnected();
-			if (unlistenClosed) unlistenClosed();
 
 			// Attempt to safely close the session backend side when switching tabs
 			invoke("write_pty", { id: session.id, data: "exit\n" }).catch(() => { });

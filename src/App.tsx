@@ -24,6 +24,7 @@ export default function App() {
   const [editingSession, setEditingSession] = useState<Session | undefined>();
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [activeChatId, setActiveChatId] = useState<number | null>(null);
+  const [isMultiExec, setIsMultiExec] = useState(false);
 
   // Resizable Panels State
   const [sidebarWidth, setSidebarWidth] = useState(220);
@@ -137,7 +138,14 @@ export default function App() {
 
   return (
     <div className={`scanlines flex flex-col ${isResizingSidebar || isResizingAiPanel ? 'select-none' : ''}`} style={{ height: "100vh", overflow: "hidden" }}>
-      <TopBar connectedCount={openTabIds.length} activeTab={activeTab} hasActiveSession={activeId !== null} onTabChange={setActiveTab} />
+      <TopBar
+        connectedCount={openTabIds.length}
+        activeTab={activeTab}
+        hasActiveSession={activeId !== null}
+        isMultiExec={isMultiExec}
+        onTabChange={setActiveTab}
+        onToggleMultiExec={() => setIsMultiExec(!isMultiExec)}
+      />
       <TabBar
         sessions={sessions}
         activeId={activeId}
@@ -168,13 +176,37 @@ export default function App() {
 
         <div className="flex-1 flex flex-col overflow-hidden relative" style={{ background: "var(--bg-base)" }}>
           {/* Terminal Layer - Persists terminals for all open tabs */}
-          <div className="flex-1 relative flex flex-col" style={{ display: activeTab === "Sessions" && activeId !== null ? "flex" : "none" }}>
+          <div
+            className="flex-1 relative overflow-hidden"
+            style={{
+              display: activeTab === "Sessions" && activeId !== null ? (isMultiExec ? "grid" : "block") : "none",
+              gridTemplateColumns: isMultiExec ? `repeat(${openTabIds.length > 2 ? 2 : openTabIds.length}, 1fr)` : undefined,
+              gridAutoRows: isMultiExec ? "1fr" : undefined,
+              gap: isMultiExec ? "2px" : "0",
+              background: isMultiExec ? "var(--border-focus)" : "transparent"
+            }}
+          >
             {openTabIds.map(id => {
               const s = sessions.find(sess => sess.id === id);
               if (!s) return null;
+              const isActive = activeId === id;
+
+              // In standard mode: absolute positioning with visibility toggle
+              // In multi-exec mode: grid items
               return (
-                <div key={id} className="absolute inset-0 flex flex-col" style={{ visibility: activeId === id ? "visible" : "hidden", pointerEvents: activeId === id ? "auto" : "none" }}>
-                  <TerminalPane session={s} />
+                <div
+                  key={id}
+                  className={isMultiExec ? "relative h-full w-full border" : "absolute inset-0"}
+                  style={{
+                    display: isMultiExec || isActive ? "flex" : "none",
+                    flexDirection: "column",
+                    borderColor: isMultiExec && isActive ? "rgba(245, 158, 11, 0.6)" : (isMultiExec ? "var(--border-focus)" : "transparent"),
+                    boxShadow: isMultiExec && isActive ? "inset 0 0 15px rgba(245, 158, 11, 0.1), 0 0 10px rgba(245, 158, 11, 0.2)" : "none",
+                    zIndex: isActive ? 5 : 1
+                  }}
+                  onClick={() => isMultiExec && setActiveId(id)}
+                >
+                  <TerminalPane session={s} isMultiExec={isMultiExec} isActive={isActive} />
                 </div>
               );
             })}

@@ -1,6 +1,75 @@
 use rusqlite::{Connection, Result, params};
 use serde::{Deserialize, Serialize};
 
+use aes_gcm::{
+    aead::{Aead, AeadCore, KeyInit, OsRng},
+    Aes256Gcm, Nonce 
+};
+use pbkdf2::pbkdf2_hmac;
+use sha2::Sha256;
+use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+use std::sync::OnceLock;
+use machineid_rs::{IdBuilder, Encryption, HWIDComponent};
+
+const SALT: &[u8] = b"izorate-secure-vault-2026";
+const ENC_PREFIX: &str = "enc:";
+
+static CRYPTO_KEY: OnceLock<[u8; 32]> = OnceLock::new();
+
+fn get_encryption_key() -> [u8; 32] {
+    *CRYPTO_KEY.get_or_init(|| {
+        let mut builder = IdBuilder::new(Encryption::MD5);
+        builder.add_component(HWIDComponent::CPUID);
+        builder.add_component(HWIDComponent::DriveSerial);
+        
+        let mid = builder.build("izorate")
+            .unwrap_or_else(|_| "izorate-fallback-key-0000".to_string());
+        
+        let mut key = [0u8; 32];
+        pbkdf2_hmac::<Sha256>(mid.as_bytes(), SALT, 1000, &mut key);
+        key
+    })
+}
+
+fn encrypt(text: &str) -> String {
+    let key = get_encryption_key();
+    let cipher = Aes256Gcm::new_from_slice(&key).unwrap();
+    let nonce = Aes256Gcm::generate_nonce(&mut OsRng); // Uses AeadCore trait
+    
+    if let Ok(ciphertext) = cipher.encrypt(&nonce, text.as_bytes()) {
+        let mut combined = nonce.to_vec();
+        combined.extend_from_slice(&ciphertext);
+        format!("{}{}", ENC_PREFIX, BASE64.encode(combined))
+    } else {
+        text.to_string()
+    }
+}
+
+fn decrypt(enc_text: &str) -> String {
+    if !enc_text.starts_with(ENC_PREFIX) {
+        return enc_text.to_string();
+    }
+    
+    let encrypted_data = &enc_text[ENC_PREFIX.len()..];
+    let Ok(data) = BASE64.decode(encrypted_data) else {
+        return enc_text.to_string();
+    };
+    
+    if data.len() < 12 { return enc_text.to_string(); }
+    
+    let (nonce_bytes, ciphertext) = data.split_at(12);
+    let nonce = Nonce::from_slice(nonce_bytes);
+    
+    let key = get_encryption_key();
+    let cipher = Aes256Gcm::new_from_slice(&key).unwrap();
+    
+    if let Ok(decrypted) = cipher.decrypt(nonce, ciphertext) {
+        String::from_utf8(decrypted).unwrap_or_else(|_| enc_text.to_string())
+    } else {
+        enc_text.to_string()
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ConnectionConfig {
     pub id: Option<i64>,
@@ -139,6 +208,7 @@ pub fn get_all(conn: &Connection) -> Result<Vec<ConnectionConfig>> {
         "SELECT id, name, host, port, conn_type, username, password, group_name FROM connections ORDER BY id"
     )?;
     let rows = stmt.query_map([], |row| {
+        let raw_password: Option<String> = row.get(6)?;
         Ok(ConnectionConfig {
             id: Some(row.get(0)?),
             name: row.get(1)?,
@@ -146,7 +216,7 @@ pub fn get_all(conn: &Connection) -> Result<Vec<ConnectionConfig>> {
             port: row.get(3)?,
             conn_type: row.get(4)?,
             username: row.get(5)?,
-            password: row.get(6)?,
+            password: raw_password.map(|p| decrypt(&p)),
             group_name: row.get(7)?,
         })
     })?;
@@ -155,10 +225,11 @@ pub fn get_all(conn: &Connection) -> Result<Vec<ConnectionConfig>> {
 
 pub fn insert(conn: &Connection, cfg: &ConnectionConfig) -> Result<i64> {
     ensure_group(conn, &cfg.group_name)?;
+    let enc_password = cfg.password.as_ref().map(|p| encrypt(p));
     conn.execute(
         "INSERT INTO connections (name, host, port, conn_type, username, password, group_name)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-        params![cfg.name, cfg.host, cfg.port, cfg.conn_type, cfg.username, cfg.password, cfg.group_name],
+        params![cfg.name, cfg.host, cfg.port, cfg.conn_type, cfg.username, enc_password, cfg.group_name],
     )?;
     Ok(conn.last_insert_rowid())
 }
@@ -166,9 +237,10 @@ pub fn insert(conn: &Connection, cfg: &ConnectionConfig) -> Result<i64> {
 pub fn update(conn: &Connection, cfg: &ConnectionConfig) -> Result<()> {
     let id = cfg.id.ok_or(rusqlite::Error::InvalidParameterName("id required".into()))?;
     ensure_group(conn, &cfg.group_name)?;
+    let enc_password = cfg.password.as_ref().map(|p| encrypt(p));
     conn.execute(
         "UPDATE connections SET name=?1, host=?2, port=?3, conn_type=?4, username=?5, password=?6, group_name=?7 WHERE id=?8",
-        params![cfg.name, cfg.host, cfg.port, cfg.conn_type, cfg.username, cfg.password, cfg.group_name, id],
+        params![cfg.name, cfg.host, cfg.port, cfg.conn_type, cfg.username, enc_password, cfg.group_name, id],
     )?;
     Ok(())
 }
@@ -188,25 +260,37 @@ pub fn get_setting(conn: &Connection, key: &str) -> Result<Option<String>> {
     let mut stmt = conn.prepare("SELECT value FROM settings WHERE key = ?1")?;
     let mut rows = stmt.query_map(params![key], |row| row.get(0))?;
     if let Some(res) = rows.next() {
-        Ok(Some(res?))
+        let val: String = res?;
+        if key.ends_with("_api_key") {
+            Ok(Some(decrypt(&val)))
+        } else {
+            Ok(Some(val))
+        }
     } else {
         Ok(None)
     }
 }
 
 pub fn set_setting(conn: &Connection, key: &str, value: &str) -> Result<()> {
+    let val_to_store = if key.ends_with("_api_key") {
+        encrypt(value)
+    } else {
+        value.to_string()
+    };
+    
     conn.execute(
         "INSERT INTO settings (key, value) VALUES (?1, ?2)
          ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-        params![key, value],
+        params![key, val_to_store],
     )?;
     Ok(())
 }
 
 pub fn add_clipboard_history(conn: &Connection, content: &str) -> Result<()> {
+    let enc_content = encrypt(content);
     conn.execute(
         "INSERT INTO clipboard_history (content) VALUES (?1)",
-        params![content],
+        params![enc_content],
     )?;
     Ok(())
 }
@@ -217,29 +301,37 @@ pub fn get_credentials(conn: &Connection) -> Result<Vec<Credential>> {
         "SELECT id, name, username, password, private_key, passphrase FROM credentials ORDER BY name"
     )?;
     let rows = stmt.query_map([], |row| {
+        let raw_pwd: Option<String> = row.get(3)?;
+        let raw_pk: Option<String> = row.get(4)?;
+        let raw_pp: Option<String> = row.get(5)?;
+        
         Ok(Credential {
             id: Some(row.get(0)?),
             name: row.get(1)?,
             username: row.get(2)?,
-            password: row.get(3)?,
-            private_key: row.get(4)?,
-            passphrase: row.get(5)?,
+            password: raw_pwd.map(|s| decrypt(&s)),
+            private_key: raw_pk.map(|s| decrypt(&s)),
+            passphrase: raw_pp.map(|s| decrypt(&s)),
         })
     })?;
     rows.collect()
 }
 
 pub fn upsert_credential(conn: &Connection, cred: &Credential) -> Result<i64> {
+    let enc_pwd = cred.password.as_ref().map(|s| encrypt(s));
+    let enc_pk = cred.private_key.as_ref().map(|s| encrypt(s));
+    let enc_pp = cred.passphrase.as_ref().map(|s| encrypt(s));
+
     if let Some(id) = cred.id {
         conn.execute(
             "UPDATE credentials SET name=?1, username=?2, password=?3, private_key=?4, passphrase=?5 WHERE id=?6",
-            params![cred.name, cred.username, cred.password, cred.private_key, cred.passphrase, id],
+            params![cred.name, cred.username, enc_pwd, enc_pk, enc_pp, id],
         )?;
         Ok(id)
     } else {
         conn.execute(
             "INSERT INTO credentials (name, username, password, private_key, passphrase) VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![cred.name, cred.username, cred.password, cred.private_key, cred.passphrase],
+            params![cred.name, cred.username, enc_pwd, enc_pk, enc_pp],
         )?;
         Ok(conn.last_insert_rowid())
     }
