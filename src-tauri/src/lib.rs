@@ -1,6 +1,7 @@
 mod db;
 mod ssh;
 mod network_tools;
+mod graph_db;
 
 use std::sync::Mutex as StdMutex;
 use std::fs;
@@ -10,6 +11,8 @@ use tauri::{State, AppHandle, Manager, Emitter};
 use db::ConnectionConfig;
 
 struct DbState(StdMutex<Connection>);
+
+struct GraphState(StdMutex<graph_db::GraphManager>);
 
 // [ ... db commands stay the same ... ]
 #[tauri::command]
@@ -230,6 +233,25 @@ fn save_clipboard_history(app: AppHandle, content: String) -> Result<(), String>
 }
 
 #[tauri::command]
+fn add_chat_graph(state: State<GraphState>, chat_id: i64, data: graph_db::GraphData) -> Result<(), String> {
+    let manager = state.0.lock().map_err(|e| e.to_string())?;
+    manager.init_chat_db(chat_id)?;
+    manager.add_data(chat_id, data)
+}
+
+#[tauri::command]
+fn get_chat_graph(state: State<GraphState>, chat_id: i64) -> Result<graph_db::GraphData, String> {
+    let manager = state.0.lock().map_err(|e| e.to_string())?;
+    manager.get_data(chat_id)
+}
+
+#[tauri::command]
+fn get_relevant_graph(state: State<GraphState>, chat_id: i64, query: String) -> Result<graph_db::GraphData, String> {
+    let manager = state.0.lock().map_err(|e| e.to_string())?;
+    manager.get_relevant_data(chat_id, &query)
+}
+
+#[tauri::command]
 async fn ping_host(app: AppHandle, state: State<'_, DbState>, host: String, count: u32, source_session_id: i64, password: Option<String>, mode: network_tools::ImplementationMode) -> Result<(), String> {
     if source_session_id == -1 {
         // Run locally with hybrid approach (binary → TCP fallback)
@@ -443,13 +465,23 @@ async fn save_terminal_video(app: AppHandle, bytes: Vec<u8>, filename: String) -
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Create data directory if not exists
+    let app_dir = std::env::current_dir().unwrap().join("data");
+    if !app_dir.exists() {
+        fs::create_dir_all(&app_dir).expect("Failed to create data directory");
+    }
+
+    let graph_path = app_dir.join("graphs");
+    let graph_manager = graph_db::GraphManager::new(graph_path);
+
     // Keep sqlite file locally
-    let conn = Connection::open("../izorate.db").expect("Failed to open database");
+    let conn = Connection::open(app_dir.join("izorate.db")).expect("Failed to open database");
     db::init_db(&conn).expect("Failed to initialize database");
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .manage(DbState(StdMutex::new(conn)))
+        .manage(GraphState(StdMutex::new(graph_manager)))
         .manage(ssh::SshManager::new())
         .invoke_handler(tauri::generate_handler![
             get_connections,
@@ -491,7 +523,10 @@ pub fn run() {
             list_models,
             get_sanitize_rules,
             add_sanitize_rule,
-            delete_sanitize_rule
+            delete_sanitize_rule,
+            add_chat_graph,
+            get_chat_graph,
+            get_relevant_graph
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

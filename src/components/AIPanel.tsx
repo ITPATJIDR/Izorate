@@ -1,82 +1,12 @@
 import { useState, useEffect, useRef, memo, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
-import copy from "copy-to-clipboard";
 import type { Message } from "../types/ai";
-import { chatWithAI } from "../services/ai";
-
-const CopyButton = ({ code }: { code: string }) => {
-	const [copied, setCopied] = useState(false);
-
-	const handleCopy = () => {
-		copy(code);
-		setCopied(true);
-		setTimeout(() => setCopied(false), 2000);
-	};
-
-	return (
-		<button
-			onClick={handleCopy}
-			className={`text-[9px] px-2 py-1 rounded border transition-all uppercase font-bold backdrop-blur-sm ${copied
-				? "bg-[var(--border-focus)] text-[var(--accent-primary)] border-[var(--accent-primary)]"
-				: "bg-[var(--bg-hover)] hover:bg-[var(--border-focus)] text-text-emerald-500/80 hover:text-[var(--accent-primary)] border-[var(--border-focus)]"
-				}`}
-		>
-			{copied ? "Copied!" : "Copy"}
-		</button>
-	);
-};
-
-const MarkdownRenderer = memo(({ content }: { content: string }) => {
-	return (
-		<ReactMarkdown
-			remarkPlugins={[remarkGfm]}
-			components={{
-				code({ node, inline, className, children, ...props }: any) {
-					const match = /language-(\w+)/.exec(className || "");
-					const codeString = String(children).replace(/\n$/, "");
-
-					if (!inline && match) {
-						return (
-							<div className="relative group/code my-2">
-								<div className="absolute right-2 top-2 z-10 opacity-0 group-hover/code:opacity-100 transition-opacity">
-									<CopyButton code={codeString} />
-								</div>
-								<SyntaxHighlighter
-									style={vscDarkPlus as any}
-									language={match[1]}
-									PreTag="div"
-									customStyle={{
-										margin: 0,
-										padding: "1rem",
-										fontSize: "11px",
-										background: "var(--bg-card)",
-										border: "1px solid var(--accent-primary)15",
-										borderRadius: "4px"
-									}}
-									{...props}
-								>
-									{codeString}
-								</SyntaxHighlighter>
-							</div>
-						);
-					}
-					return (
-						<code className={className} {...props}>
-							{children}
-						</code>
-					);
-				}
-			}}
-		>
-			{content}
-		</ReactMarkdown>
-	);
-});
+import { chatWithAI, extractGraphFromContext } from "../services/ai";
+import { GraphModal } from "./GraphModal";
+import { ChatMessage } from "./chat/ChatMessage";
+import { ChatInput } from "./chat/ChatInput";
+import { SanitizationModal } from "./chat/SanitizationModal";
 
 interface AIPanelProps {
 	width?: number;
@@ -113,6 +43,9 @@ export const AIPanel = memo(({ width = 280, activeChatId, onToggleCollapse }: AI
 	const [modalHeight, setModalHeight] = useState(600);
 	const [isResizingModal, setIsResizingModal] = useState(false);
 	const [isMaximized, setIsMaximized] = useState(false);
+	const [isGraphOpen, setIsGraphOpen] = useState(false);
+	const [isExtractingGraph, setIsExtractingGraph] = useState(false);
+	const [aiStatus, setAiStatus] = useState<string>("");
 
 	const checkAiStatus = useCallback(async () => {
 		try {
@@ -272,6 +205,43 @@ export const AIPanel = memo(({ width = 280, activeChatId, onToggleCollapse }: AI
 		setEditingContext(null);
 	};
 
+	const extractAndSaveGraph = async (ctx: { text: string }) => {
+		if (!activeChatId) {
+			console.warn("No active chat ID for graph extraction");
+			return;
+		}
+		setIsExtractingGraph(true);
+		console.log("Starting graph extraction for chat:", activeChatId);
+		try {
+			const graphData = await extractGraphFromContext(ctx.text);
+			console.log("Extracted graph data:", graphData);
+
+			if (graphData.entities.length > 0) {
+				const sanitizedData = {
+					entities: graphData.entities.map(e => ({
+						id: String(e.id).toLowerCase().trim(),
+						node_type: e.type || e.node_type || "Entity",
+						properties: typeof e.properties === 'object' ? JSON.stringify(e.properties) : String(e.properties || "")
+					})),
+					relationships: (graphData.relationships || []).map(r => ({
+						source: String(r.source).toLowerCase().trim(),
+						target: String(r.target).toLowerCase().trim(),
+						rel_type: r.type || r.rel_type || "DEPENDS_ON"
+					}))
+				};
+				console.log("Sending sanitized graph data to backend:", sanitizedData);
+				await invoke("add_chat_graph", { chatId: activeChatId, data: sanitizedData });
+				console.log("Graph data saved successfully");
+			} else {
+				console.warn("AI extracted 0 entities from context");
+			}
+		} catch (err: any) {
+			console.error("Failed to extract graph:", err);
+		} finally {
+			setIsExtractingGraph(false);
+		}
+	};
+
 	const handleModelChange = async (newModel: string) => {
 		try {
 			await invoke("set_izorate_setting", { key: "ai_model", value: newModel });
@@ -304,24 +274,56 @@ export const AIPanel = memo(({ width = 280, activeChatId, onToggleCollapse }: AI
 	};
 
 	const handleSend = async () => {
-		if ((!question.trim() && contexts.length === 0) || !activeChatId || isGenerating) return;
+		if (isGenerating || (!question.trim() && contexts.length === 0) || !activeChatId) return;
 
+		setIsGenerating(true);
 		let userMsg = question.trim();
 
-		// Append context if available
+		// 1. Automatic Graph Extraction for new contexts
 		if (contexts.length > 0) {
+			setAiStatus("Extracting Knowledge Graph...");
+			for (const ctx of contexts) {
+				await extractAndSaveGraph(ctx);
+			}
+		}
+
+		// 2. Retrieve & Prune Graph Data for Retrieval-Augmentation (Backend Powered)
+		setAiStatus("Consulting Knowledge Graph...");
+		let graphContext = "";
+		try {
+			const pruned = await invoke<any>("get_relevant_graph", {
+				chatId: activeChatId,
+				query: userMsg
+			});
+
+			if (pruned.entities && pruned.entities.length > 0) {
+				graphContext = "\n\n### RELEVANT KNOWLEDGE GRAPH CONTEXT\n";
+				graphContext += "Entities:\n" + pruned.entities.map((e: any) => `- [${e.node_type}] ${e.id}: ${e.properties}`).join("\n");
+				if (pruned.relationships && pruned.relationships.length > 0) {
+					graphContext += "\nRelationships:\n" + pruned.relationships.map((r: any) => `- ${r.source} --(${r.rel_type})--> ${r.target}`).join("\n");
+				}
+				graphContext += "\n\n(Use the structural relationships above to inform your analysis)";
+			}
+		} catch (err) {
+			console.error("Failed to retrieve relevant graph:", err);
+		}
+
+		// Append context if available
+		if (contexts.length > 0 || graphContext) {
 			const contextBlock = contexts.map(c =>
 				`Context from [${c.sessionName}]:\n\`\`\`\n${c.text}\n\`\`\``
 			).join("\n\n");
 
+			const combinedContext = contextBlock ? `${contextBlock}${graphContext}` : graphContext;
+
 			userMsg = userMsg
-				? `${userMsg}\n\n---\n${contextBlock}`
-				: `Please analyze this terminal context:\n\n${contextBlock}`;
+				? `${userMsg}\n\n---\n${combinedContext}`
+				: `Please analyze the terminal context and knowledge graph:\n\n${combinedContext}`;
 		}
 
 		setQuestion("");
 		setContexts([]);
-		setIsGenerating(true);
+		setAiStatus("Thinking...");
 
 		try {
 			// Save user message
@@ -380,6 +382,16 @@ export const AIPanel = memo(({ width = 280, activeChatId, onToggleCollapse }: AI
 				<span className={`text-[10px] uppercase font-bold tracking-widest ${isGenerating ? 'ai-shimmer' : 'text-text-emerald-500/80'}`}>
 					⬡ AI Assistant
 				</span>
+				{activeChatId && (
+					<button
+						onClick={() => setIsGraphOpen(true)}
+						className={`ml-2 text-[10px] px-2 py-0.5 rounded border border-[var(--border-focus)] transition-all uppercase font-bold flex items-center gap-1 ${isExtractingGraph ? 'animate-pulse text-amber-500' : 'text-[var(--text-muted)] hover:text-[var(--accent-primary)] hover:border-[var(--accent-primary)]'}`}
+						title="Knowledge Graph (Graph RAG)"
+					>
+						<span>{isExtractingGraph ? "⚡" : "🕸️"}</span>
+						<span className="hidden group-hover:inline">Graph</span>
+					</button>
+				)}
 				{(activeChatId && (isGenerating || !hasApiKey)) && (
 					<div className="ml-auto flex items-center gap-1">
 						{!hasApiKey ? (
@@ -410,250 +422,56 @@ export const AIPanel = memo(({ width = 280, activeChatId, onToggleCollapse }: AI
 							<div className="text-[10px] italic text-center py-4" style={{ color: "var(--text-muted)" }}>Start a conversation with Izorate AI.</div>
 						) : (
 							messages.map((msg, i) => (
-								<div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-									<div className="max-w-[90%] text-xs p-2 rounded leading-relaxed border"
-										style={{ background: "var(--bg-surface)", borderColor: "var(--border-focus)", color: "var(--text-main)" }}>
-										<div className="flex justify-between items-center mb-1 opacity-40">
-											<span className="text-[9px] uppercase font-bold tracking-widest">
-												{msg.role === "ai" ? "Assistant" : "User"}
-											</span>
-										</div>
-										<div className="markdown-content">
-											<MarkdownRenderer content={msg.content} />
-										</div>
-									</div>
-								</div>
+								<ChatMessage key={i} msg={msg} />
 							))
 						)}
 						{isGenerating && (
 							<div className="flex justify-start">
-								<div className="max-w-[90%] text-[10px] p-2 rounded italic opacity-50 border border-dashed border-[var(--border-focus)]" style={{ color: "var(--accent-primary)" }}>
-									AI is typing...
+								<div className="max-w-[90%] text-[10px] p-2 rounded italic opacity-70 border border-dashed border-[var(--border-focus)] animate-pulse" style={{ color: "var(--accent-primary)" }}>
+									{aiStatus || "AI is typing..."}
 								</div>
 							</div>
 						)}
 					</div>
 
-					{/* Input */}
-					<div className="p-2 border-t" style={{ borderColor: "var(--border-focus)" }}>
-						{!hasApiKey ? (
-							<div className="p-3 text-center">
-								<p className="text-[10px] text-red-400 mb-2">API Key required to chat.</p>
-								<button
-									className="text-[9px] px-2 py-1 border border-red-900/30 text-red-400/60 hover:text-red-400 transition-all uppercase font-bold"
-									onClick={() => alert("Go to Settings > AI Assistant and provide an API key.")}
-								>
-									Open Settings
-								</button>
-							</div>
-						) : (
-							<div className="flex flex-col gap-2">
-								<div className="flex flex-wrap gap-1.5 min-h-[5px]">
-									{contexts.map(ctx => (
-										<div
-											key={ctx.id}
-											onClick={() => openSanitizeModal(ctx)}
-											className="flex items-center gap-1.5 px-2 py-0.5 rounded border border-[var(--border-focus)] bg-[var(--bg-hover)] text-[var(--accent-primary)] text-[9px] uppercase font-bold tracking-tight crt-glow group cursor-pointer hover:border-[var(--accent-primary)] transition-all"
-										>
-											<span className="opacity-60 text-[7px] text-[var(--text-muted)]">Terminal:</span>
-											<span>{ctx.sessionName}</span>
-											<button
-												onClick={(e) => { e.stopPropagation(); removeContext(ctx.id); }}
-												className="ml-1 text-[var(--text-muted)] hover:text-red-400 transition-colors"
-												title="Remove Context"
-											>
-												✕
-											</button>
-										</div>
-									))}
-								</div>
-
-								<div className="flex items-center justify-between px-1">
-									<div className="flex items-center gap-1.5">
-										<span className="text-[8px] text-[var(--text-muted)] uppercase font-bold tracking-tighter">Model:</span>
-										<select
-											value={currentModel}
-											onChange={(e) => handleModelChange(e.target.value)}
-											disabled={loadingModels}
-											className="bg-transparent text-[9px] text-[var(--accent-primary)] outline-none cursor-pointer border-none p-0 uppercase font-mono hover:text-cyan-400 transition-colors disabled:opacity-30"
-										>
-											{loadingModels ? (
-												<option>Loading...</option>
-											) : availableModels.length > 0 ? (
-												availableModels.map(m => (
-													<option key={m} value={m} className="bg-[var(--bg-surface)]">{m}</option>
-												))
-											) : (
-												<option value="">{currentProvider === "Anthropic" ? "standard" : "No models"}</option>
-											)}
-										</select>
-									</div>
-									<span className="text-[8px] text-[var(--text-muted)] uppercase font-bold">{currentProvider}</span>
-								</div>
-
-								<div className="flex items-start gap-2 p-2 rounded" style={{ background: "var(--bg-surface)", border: "1px solid var(--border-focus)" }}>
-									<textarea
-										ref={inputRef}
-										value={question}
-										onChange={e => setQuestion(e.target.value)}
-										onKeyDown={e => {
-											if (e.key === "Enter" && !e.shiftKey) {
-												e.preventDefault();
-												handleSend();
-											}
-										}}
-										disabled={isGenerating}
-										className="flex-1 bg-transparent outline-none text-xs placeholder-emerald-900 disabled:opacity-30 resize-none custom-scrollbar"
-										style={{ color: "var(--accent-primary)", fontFamily: "inherit", minHeight: "20px", height: "auto", overflowY: "auto" }}
-										placeholder={isGenerating ? "AI is thinking..." : "ask AI anything... (Shift+Enter for newline)"}
-									/>
-									<button
-										disabled={isGenerating || (!question.trim() && contexts.length === 0)}
-										onClick={handleSend}
-										className="mt-0.5 text-xs transition-colors hover:text-green-300 disabled:opacity-20 flex-shrink-0"
-										style={{ color: "var(--accent-primary)" }}
-									>
-										⏎
-									</button>
-								</div>
-							</div>
-						)}
-					</div>
+					<ChatInput
+						question={question}
+						setQuestion={setQuestion}
+						onSend={handleSend}
+						isGenerating={isGenerating}
+						hasApiKey={hasApiKey}
+						contexts={contexts}
+						onRemoveContext={removeContext}
+						onOpenSanitizeModal={openSanitizeModal}
+						currentModel={currentModel}
+						availableModels={availableModels}
+						handleModelChange={handleModelChange}
+						loadingModels={loadingModels}
+						currentProvider={currentProvider}
+						aiStatus={aiStatus}
+					/>
 				</>
 			)}
 
-			{/* Sanitize Modal */}
-			{editingContext && (
-				<div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-					<div
-						className={`bg-[var(--bg-base)] border border-[var(--border-focus)] rounded-lg shadow-2xl flex flex-col overflow-hidden relative ${isMaximized ? "fixed inset-8 w-auto max-w-none max-h-none" : ""}`}
-						style={!isMaximized ? { width: `${modalWidth}px`, height: `${modalHeight}px`, maxWidth: "95vw", maxHeight: "90vh" } : {}}
-					>
-						{/* Modal Header */}
-						<div className="px-4 py-3 border-b flex items-center justify-between bg-[var(--bg-surface)]" style={{ borderColor: "var(--border-focus)" }}>
-							<h3 className="text-sm font-bold uppercase tracking-widest text-[var(--accent-primary)] flex items-center gap-2">
-								<span>🛡️ Sanitized Context</span>
-								<span className="text-[10px] text-[var(--text-muted)] font-normal">Apply rules and edit sensitive info</span>
-							</h3>
-							<div className="flex items-center gap-4">
-								<button
-									onClick={() => setIsMaximized(!isMaximized)}
-									className="text-[10px] text-[var(--text-muted)] hover:text-[var(--accent-primary)] transition-colors uppercase font-bold tracking-tighter"
-									title={isMaximized ? "Restore" : "Maximize"}
-								>
-									{isMaximized ? "🗗 Restore" : "🗖 Maximize"}
-								</button>
-								<button onClick={() => setEditingContext(null)} className="text-[var(--text-muted)] hover:text-white transition-colors">✕</button>
-							</div>
-						</div>
+			<SanitizationModal
+				editingContext={editingContext}
+				onClose={() => setEditingContext(null)}
+				sessionRules={sessionRules}
+				newRule={newRule}
+				setNewRule={setNewRule}
+				onAddRule={addRule}
+				onDeleteRule={deleteRule}
+				onSave={saveEditedContext}
+				onUpdateText={(text) => setEditingContext(prev => prev ? { ...prev, text } : null)}
+				isMaximized={isMaximized}
+				setIsMaximized={setIsMaximized}
+				modalWidth={modalWidth}
+				modalHeight={modalHeight}
+				startModalResize={startModalResize}
+			/>
 
-						{/* Modal Content */}
-						<div className="flex-1 flex overflow-hidden">
-							<div className="flex-[3] flex flex-col p-4 border-r overflow-hidden" style={{ borderColor: "var(--border-focus)" }}>
-								<div className="flex items-center justify-between mb-2">
-									<label className="text-[10px] font-bold text-[var(--text-muted)] uppercase italic">Terminal Output / Context Payload</label>
-									<span className="text-[9px] text-[var(--accent-primary)]/40 font-mono select-none">Line Editing Mode</span>
-								</div>
-								<textarea
-									value={editingContext.text}
-									onChange={(e) => setEditingContext({ ...editingContext, text: e.target.value })}
-									className="flex-1 bg-[var(--bg-base)]/30 border border-[var(--border-focus)] rounded p-4 text-xs text-[var(--text-main)] outline-none focus:border-[var(--accent-primary)] font-mono resize-none custom-scrollbar leading-relaxed"
-									placeholder="Context is empty..."
-								/>
-							</div>
-
-							<div className="flex-[2] flex flex-col p-4 bg-[var(--bg-surface)]/30 overflow-hidden border-l border-white/5">
-								<div className="flex items-center gap-2 mb-3">
-									<div className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" />
-									<label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">Sanitization History</label>
-								</div>
-
-								{/* Rule List (Replacement Log) */}
-								<div className="flex-1 overflow-y-auto mb-4 border border-[var(--border-focus)] rounded bg-[var(--bg-base)]/80 p-2 flex flex-col gap-2 custom-scrollbar shadow-inner">
-									{sessionRules.length === 0 ? (
-										<div className="h-full flex flex-col items-center justify-center text-[10px] italic text-[var(--text-muted)] p-6 text-center opacity-30 select-none">
-											<div className="text-2xl mb-2">∅</div>
-											<p>No active filters for this session.</p>
-										</div>
-									) : (
-										sessionRules.map(rule => (
-											<div key={rule.id} className="p-2.5 border border-[var(--border-focus)] bg-[var(--bg-surface)] rounded-md relative group hover:bg-[var(--bg-hover)] transition-all">
-												<div className="flex flex-col gap-1">
-													<div className="flex items-center gap-1.5 overflow-hidden">
-														<span className="text-[9px] text-red-400 font-bold px-1.5 py-0.5 rounded bg-red-400/10 border border-red-400/20 shrink-0">FIND</span>
-														<span className="text-[10px] font-mono truncate opacity-80">{rule.pattern}</span>
-													</div>
-													<div className="flex items-center gap-1.5 overflow-hidden">
-														<span className="text-[9px] text-green-400 font-bold px-1.5 py-0.5 rounded bg-green-400/10 border border-green-400/20 shrink-0">REPL</span>
-														<span className="text-[10px] font-mono truncate opacity-100">{rule.replacement || "—"}</span>
-													</div>
-												</div>
-												<button
-													onClick={() => deleteRule(rule.id)}
-													className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 text-red-500 hover:bg-red-500/10 rounded"
-													title="Delete Rule"
-												>✕</button>
-											</div>
-										))
-									)}
-								</div>
-
-								{/* New Rule Form */}
-								<div className="space-y-3 p-4 border border-[var(--accent-primary)]/20 rounded bg-[var(--bg-base)] shadow-lg relative overflow-hidden">
-									<div className="absolute top-0 left-0 w-1 h-full bg-[var(--accent-primary)] opacity-30" />
-									<p className="text-[9px] font-black text-[var(--accent-primary)] uppercase tracking-[0.2em] mb-1">Add Sanitization Rule</p>
-
-									<div className="space-y-2">
-										<div className="flex flex-col gap-1">
-											<span className="text-[8px] text-[var(--text-muted)] uppercase font-bold ml-1">Pattern to hide</span>
-											<input
-												type="text"
-												placeholder="e.g. password=123"
-												value={newRule.pattern}
-												onChange={e => setNewRule({ ...newRule, pattern: e.target.value })}
-												className="w-full bg-[var(--bg-surface)] border border-[var(--border-focus)] rounded-md px-3 py-2 text-[10px] text-white outline-none focus:border-[var(--accent-primary)] transition-all placeholder:opacity-30"
-											/>
-										</div>
-										<div className="flex flex-col gap-1">
-											<span className="text-[8px] text-[var(--text-muted)] uppercase font-bold ml-1">Replacement text</span>
-											<input
-												type="text"
-												placeholder="e.g. [SECRET_HIDDEN]"
-												value={newRule.replacement}
-												onChange={e => setNewRule({ ...newRule, replacement: e.target.value })}
-												className="w-full bg-[var(--bg-surface)] border border-[var(--border-focus)] rounded-md px-3 py-2 text-[10px] text-white outline-none focus:border-[var(--accent-primary)] transition-all placeholder:opacity-30"
-											/>
-										</div>
-									</div>
-
-									<button
-										onClick={addRule}
-										disabled={!newRule.pattern}
-										className="w-full bg-[var(--accent-primary)]/10 border border-[var(--accent-primary)]/40 text-[var(--accent-primary)] text-[10px] font-black py-2 uppercase tracking-widest hover:bg-[var(--accent-primary)] hover:text-black transition-all disabled:opacity-10 cursor-pointer rounded mt-1 shadow-[0_4px_10px_rgba(0,0,0,0.3)]"
-									>
-										Apply Globally
-									</button>
-								</div>
-							</div>
-						</div>
-
-						{/* Modal Footer */}
-						<div className="px-4 py-3 border-t flex items-center justify-end gap-3 bg-[var(--bg-surface)] relative" style={{ borderColor: "var(--border-focus)" }}>
-							<button onClick={() => setEditingContext(null)} className="text-[10px] text-[var(--text-muted)] uppercase font-bold px-4 py-2 hover:bg-[var(--bg-hover)] rounded transition-all">Cancel</button>
-							<button onClick={saveEditedContext} className="bg-[var(--accent-primary)] text-black text-[10px] uppercase font-bold px-6 py-2 rounded hover:shadow-[0_0_15px_var(--accent-primary)] transition-all">Save Context</button>
-
-							{/* Resize Handle */}
-							{!isMaximized && (
-								<div
-									onMouseDown={startModalResize}
-									className="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize flex items-end justify-end p-0.5 group"
-								>
-									<div className="w-2 h-2 border-r-2 border-b-2 border-[var(--text-muted)] group-hover:border-[var(--accent-primary)] transition-colors" />
-								</div>
-							)}
-						</div>
-					</div>
-				</div>
+			{isGraphOpen && activeChatId && (
+				<GraphModal chatId={activeChatId} onClose={() => setIsGraphOpen(false)} />
 			)}
 		</div>
 	);
