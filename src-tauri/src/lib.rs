@@ -143,6 +143,16 @@ async fn resize_pty(state: State<'_, ssh::SshManager>, id: i64, cols: u32, rows:
     Ok(())
 }
 
+#[tauri::command]
+async fn disconnect_ssh(state: State<'_, ssh::SshManager>, id: i64) -> Result<(), String> {
+    let mut map = state.active.lock().await;
+    if let Some(conn) = map.remove(&id) {
+        // Close signals the SSH task to exit its loop cleanly
+        let _ = conn.tx.send(ssh::SshCmd::Close).await;
+    }
+    Ok(())
+}
+
 #[derive(serde::Serialize)]
 struct SshStats {
     rx: usize,
@@ -462,6 +472,7 @@ pub fn run() {
             connect_ssh,
             write_pty,
             resize_pty,
+            disconnect_ssh,
             get_ssh_stats,
             measure_latency,
             ssh::list_sftp_directory,

@@ -100,7 +100,8 @@ export function TerminalPane({ session, isMultiExec, isActive }: Props) {
 			}
 		});
 
-		const setupListeners = async () => {
+		// Store the setup promise so cleanup can cancel in-flight registrations
+		const setupListeners = async (): Promise<void> => {
 			const u1 = await listen<string>(`ssh-out-${session.id}`, (e) => {
 				if (active) term.write(e.payload);
 			});
@@ -124,8 +125,7 @@ export function TerminalPane({ session, isMultiExec, isActive }: Props) {
 			unlistenFuncs.push(u3);
 
 			const u4 = await listen<{ data: string, sourceId: number }>("multi-exec-input", (e) => {
-				// Only process broadcast if we are NOT the active (broadcasting) terminal
-				// AND the mode is on, AND it's not our own broadcast
+				// Only process broadcast from the active terminal; ignore own source
 				if (active && isMultiExecRef.current && !isActiveRef.current && e.payload.sourceId !== session.id) {
 					invoke("write_pty", { id: session.id, data: e.payload.data }).catch(() => { });
 				}
@@ -133,7 +133,7 @@ export function TerminalPane({ session, isMultiExec, isActive }: Props) {
 			if (!active) { u4(); return; }
 			unlistenFuncs.push(u4);
 		};
-		setupListeners();
+		const listenersReady = setupListeners();
 
 		// Send input from user typing
 		const onDataDisp = term.onData(data => {
@@ -226,7 +226,13 @@ export function TerminalPane({ session, isMultiExec, isActive }: Props) {
 
 		return () => {
 			active = false;
-			unlistenFuncs.forEach(u => u());
+
+			// Wait for any in-flight listener setup to complete, then unlisten all
+			listenersReady.then(() => {
+				unlistenFuncs.forEach(u => u());
+			}).catch(() => {
+				unlistenFuncs.forEach(u => u());
+			});
 
 			window.removeEventListener("resize", handleWindowResize);
 			if (resizeObserver) resizeObserver.disconnect();
@@ -240,8 +246,8 @@ export function TerminalPane({ session, isMultiExec, isActive }: Props) {
 			onSelectionDisp.dispose();
 			term.dispose();
 
-			// Attempt to safely close the session backend side when switching tabs
-			invoke("write_pty", { id: session.id, data: "exit\n" }).catch(() => { });
+			// Properly disconnect the SSH session backend when tab is closed
+			invoke("disconnect_ssh", { id: session.id }).catch(() => { });
 		};
 	}, [session.id, refreshKey]); // Re-run when switching sessions or refreshing
 
