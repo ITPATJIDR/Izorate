@@ -4,6 +4,7 @@ mod network_tools;
 mod graph_db;
 mod crypto;
 mod vault;
+mod ai;
 
 use tokio::sync::Mutex as AsyncMutex;
 use std::fs;
@@ -238,8 +239,64 @@ async fn save_clipboard_history(state: State<'_, DbState>, content: String) -> R
 #[tauri::command]
 async fn add_chat_graph(state: State<'_, GraphState>, chat_id: i64, data: graph_db::GraphData) -> Result<(), String> {
     let manager = state.0.lock().await;
-    manager.init_chat_db(chat_id)?;
-    manager.add_data(chat_id, data)
+    manager.init_chat_db(chat_id).map_err(|e| e.to_string())?;
+    manager.add_data(chat_id, data).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn extract_graph_backend(state: State<'_, DbState>, context: String) -> Result<ai::GraphOutput, String> {
+    let (provider, model, key) = {
+        let conn = state.conn.lock().await;
+        let p = db::get_setting(&conn, "ai_provider").map_err(|e| e.to_string())?.unwrap_or("OpenAI".to_string());
+        let m = db::get_setting(&conn, "ai_model").map_err(|e| e.to_string())?.unwrap_or("gpt-4o".to_string());
+        
+        let key_name = match p.as_str() {
+            "OpenAI" => "openai_api_key",
+            "Anthropic" => "anthropic_api_key",
+            "Google" => "gemini_api_key",
+            _ => return Err("Unsupported provider".to_string()),
+        };
+        
+        let k = db::get_setting(&conn, key_name).map_err(|e| e.to_string())?
+            .ok_or(format!("{} not set", key_name))?;
+            
+        (p, m, k)
+    };
+
+    ai::extract_graph(&provider, &model, &key, &context).await
+}
+
+#[tauri::command]
+async fn chat_with_ai_backend(state: State<'_, DbState>, messages: Vec<ai::AIMessage>) -> Result<String, String> {
+    let (provider, model, key) = {
+        let conn = state.conn.lock().await;
+        let p = db::get_setting(&conn, "ai_provider").map_err(|e| e.to_string())?.unwrap_or("OpenAI".to_string());
+        let m = db::get_setting(&conn, "ai_model").map_err(|e| e.to_string())?.unwrap_or("gpt-4o".to_string());
+        
+        let key_name = match p.as_str() {
+            "OpenAI" => "openai_api_key",
+            "Anthropic" => "anthropic_api_key",
+            "Google" => "gemini_api_key",
+            _ => return Err("Unsupported provider".to_string()),
+        };
+        
+        let k = db::get_setting(&conn, key_name).map_err(|e| e.to_string())?
+            .ok_or(format!("{} not set", key_name))?;
+            
+        (p, m, k)
+    };
+
+    let latest_user_msg = messages.last().map(|m| m.content.clone()).unwrap_or_default();
+    let history_context = messages[0..messages.len().saturating_sub(1)]
+        .iter()
+        .map(|m| format!("{}: {}", m.role, m.content))
+        .collect::<Vec<_>>()
+        .join("\n\n");
+
+    let system_msg = "You are Antigravity, a System Architecture & SRE Expert assistant.";
+    let user_msg = format!("History Context:\n{}\n\nQuestion: {}", history_context, latest_user_msg);
+
+    ai::call_ai_backend(&provider, &model, &key, system_msg, &user_msg, false).await
 }
 
 #[tauri::command]
@@ -514,16 +571,15 @@ pub fn run() {
             add_group,
             rename_group,
             delete_group,
-            add_connection,
-            update_connection,
-            delete_connection,
-            get_credentials,
-            upsert_credential,
-            delete_credential,
-            move_connection_group,
-            get_chats,
-            create_chat,
+            save_clipboard_history,
+            extract_graph_backend,
+            chat_with_ai_backend,
+            add_chat_graph,
+            get_chat_graph,
+            get_relevant_graph,
             delete_chat,
+            create_chat,
+            get_chats,
             get_messages,
             add_message,
             connect_ssh,
@@ -537,7 +593,9 @@ pub fn run() {
             ssh::download_file,
             get_izorate_setting,
             set_izorate_setting,
-            save_clipboard_history,
+            get_sanitize_rules,
+            add_sanitize_rule,
+            delete_sanitize_rule,
             save_terminal_video,
             emit_terminal_selection,
             ping_host,

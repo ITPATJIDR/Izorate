@@ -27,14 +27,26 @@ interface GraphModalProps {
 }
 
 const TYPE_COLORS: Record<string, string> = {
-	"Service": "#22d3ee", // Cyan
-	"Config": "#fbbf24",  // Amber
-	"Error": "#ef4444",   // Red
-	"Container": "#8b5cf6", // Violet
-	"Network": "#10b981",  // Emerald
-	"Port": "#f472b6",    // Pink
-	"User": "#60a5fa",    // Blue
-	"File": "#94a3b8"     // Slate
+	"Service": "#22d3ee",    // Cyan
+	"Config": "#fbbf24",     // Amber
+	"Error": "#ef4444",      // Red
+	"Container": "#8b5cf6",  // Violet
+	"Network": "#10b981",    // Emerald
+	"Port": "#f472b6",       // Pink
+	"User": "#60a5fa",       // Blue
+	"File": "#94a3b8",       // Slate
+	"Database": "#f97316",   // Orange
+	"Queue": "#a855f7",      // Purple
+	"Cluster": "#14b8a6",    // Teal
+	"Node": "#06b6d4",       // Cyan-dark
+	"Pod": "#22d3ee",        // Cyan
+	"Deployment": "#3b82f6", // Blue
+	"ReplicaSet": "#6366f1", // Indigo
+	"Proxy": "#eab308",      // Yellow
+	"Volume": "#78716c",     // Stone
+	"Secret": "#dc2626",     // Deep Red
+	"Namespace": "#059669",  // Emerald-dark
+	"Entity": "#9ca3af",     // Gray (fallback)
 };
 
 export const GraphModal = ({ chatId, onClose }: GraphModalProps) => {
@@ -94,7 +106,7 @@ export const GraphModal = ({ chatId, onClose }: GraphModalProps) => {
 		<div className="fixed inset-0 z-[200] flex items-center justify-center p-8 bg-black/80 backdrop-blur-md">
 			<div className="w-full h-full max-w-6xl max-h-[90vh] bg-[var(--bg-base)] border border-[var(--border-focus)] rounded-xl shadow-2xl flex flex-col overflow-hidden relative">
 				{/* Header */}
-				<div className="px-6 py-4 border-b flex items-center justify-between bg-[var(--bg-surface)]" style={{ borderColor: "var(--border-focus)" }}>
+				<div className="px-6 py-4 border-b flex items-center justify-between bg-[var(--bg-surface)] shrink-0" style={{ borderColor: "var(--border-focus)" }}>
 					<div className="flex items-center gap-3">
 						<div className="text-xl">🕸️</div>
 						<div>
@@ -102,17 +114,18 @@ export const GraphModal = ({ chatId, onClose }: GraphModalProps) => {
 							<p className="text-[10px] text-[var(--text-muted)]">Structural relationships extracted from sanitized context</p>
 						</div>
 					</div>
-					<div className="flex items-center gap-6">
-						<div className="flex items-center gap-4">
-							{Object.entries(TYPE_COLORS).map(([type, color]) => (
-								<div key={type} className="flex items-center gap-1.5">
-									<div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
-									<span className="text-[9px] uppercase font-bold text-[var(--text-muted)]">{type}</span>
-								</div>
-							))}
+					<button onClick={onClose} className="text-xl p-2 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-white transition-all">✕</button>
+				</div>
+
+				{/* Legend Bar (Scrollable) */}
+				<div className="px-6 py-2 border-b flex items-center gap-4 overflow-x-auto custom-scrollbar shrink-0 bg-[var(--bg-base)]" style={{ borderColor: "var(--border-focus)" }}>
+					<span className="text-[9px] uppercase font-black text-[var(--accent-primary)]/50 sticky left-0 bg-[var(--bg-base)] pr-2">Legend:</span>
+					{Object.entries(TYPE_COLORS).map(([type, color]) => (
+						<div key={type} className="flex items-center gap-1.5 shrink-0">
+							<div className="w-2 h-2 rounded-full shadow-[0_0_8px] shadow-current" style={{ backgroundColor: color, color: color }} />
+							<span className="text-[9px] uppercase font-bold text-[var(--text-muted)] whitespace-nowrap">{type}</span>
 						</div>
-						<button onClick={onClose} className="text-[var(--text-muted)] hover:text-white transition-colors text-xl p-1">✕</button>
-					</div>
+					))}
 				</div>
 
 				{/* Content */}

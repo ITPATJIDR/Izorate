@@ -2805,6 +2805,7 @@ dependencies = [
  "machineid-rs",
  "netstat2",
  "pbkdf2",
+ "regex",
  "reqwest 0.12.28",
  "rusqlite",
  "russh",
