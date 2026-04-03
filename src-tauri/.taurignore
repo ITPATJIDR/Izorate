@@ -1,0 +1,4 @@
+data/izorate.db
+data/izorate.db-journal
+data/izorate.db-shm
+data/izorate.db-wal

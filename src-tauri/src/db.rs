@@ -1,74 +1,7 @@
 use rusqlite::{Connection, Result, params};
 use serde::{Deserialize, Serialize};
-
-use aes_gcm::{
-    aead::{Aead, AeadCore, KeyInit, OsRng},
-    Aes256Gcm, Nonce 
-};
-use pbkdf2::pbkdf2_hmac;
-use sha2::Sha256;
-use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
-use std::sync::OnceLock;
-use machineid_rs::{IdBuilder, Encryption, HWIDComponent};
-
-const SALT: &[u8] = b"izorate-secure-vault-2026";
-const ENC_PREFIX: &str = "enc:";
-
-static CRYPTO_KEY: OnceLock<[u8; 32]> = OnceLock::new();
-
-fn get_encryption_key() -> [u8; 32] {
-    *CRYPTO_KEY.get_or_init(|| {
-        let mut builder = IdBuilder::new(Encryption::MD5);
-        builder.add_component(HWIDComponent::CPUID);
-        builder.add_component(HWIDComponent::SystemID);
-        
-        let mid = builder.build("izorate")
-            .unwrap_or_else(|_| "izorate-fallback-key-0000".to_string());
-        
-        let mut key = [0u8; 32];
-        pbkdf2_hmac::<Sha256>(mid.as_bytes(), SALT, 1000, &mut key);
-        key
-    })
-}
-
-fn encrypt(text: &str) -> String {
-    let key = get_encryption_key();
-    let cipher = Aes256Gcm::new_from_slice(&key).unwrap();
-    let nonce = Aes256Gcm::generate_nonce(&mut OsRng); // Uses AeadCore trait
-    
-    if let Ok(ciphertext) = cipher.encrypt(&nonce, text.as_bytes()) {
-        let mut combined = nonce.to_vec();
-        combined.extend_from_slice(&ciphertext);
-        format!("{}{}", ENC_PREFIX, BASE64.encode(combined))
-    } else {
-        text.to_string()
-    }
-}
-
-fn decrypt(enc_text: &str) -> String {
-    if !enc_text.starts_with(ENC_PREFIX) {
-        return enc_text.to_string();
-    }
-    
-    let encrypted_data = &enc_text[ENC_PREFIX.len()..];
-    let Ok(data) = BASE64.decode(encrypted_data) else {
-        return enc_text.to_string();
-    };
-    
-    if data.len() < 12 { return enc_text.to_string(); }
-    
-    let (nonce_bytes, ciphertext) = data.split_at(12);
-    let nonce = Nonce::from_slice(nonce_bytes);
-    
-    let key = get_encryption_key();
-    let cipher = Aes256Gcm::new_from_slice(&key).unwrap();
-    
-    if let Ok(decrypted) = cipher.decrypt(nonce, ciphertext) {
-        String::from_utf8(decrypted).unwrap_or_else(|_| enc_text.to_string())
-    } else {
-        enc_text.to_string()
-    }
-}
+use crate::crypto::{encrypt, decrypt};
+use crate::vault::VaultManager;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ConnectionConfig {
@@ -271,10 +204,19 @@ pub fn get_setting(conn: &Connection, key: &str) -> Result<Option<String>> {
     }
 }
 
-pub fn set_setting(conn: &Connection, key: &str, value: &str) -> Result<()> {
+pub fn set_setting(conn: &Connection, key: &str, value: &str, vault: Option<&VaultManager>) -> Result<()> {
     let val_to_store = if key.ends_with("_api_key") {
-        encrypt(value)
+        let enc = encrypt(value);
+        if let Some(v) = vault {
+            v.set(key, value);
+        }
+        enc
     } else {
+        if key.contains("session") || key.contains("token") {
+             if let Some(v) = vault {
+                v.set(key, value);
+            }
+        }
         value.to_string()
     };
     
@@ -283,6 +225,17 @@ pub fn set_setting(conn: &Connection, key: &str, value: &str) -> Result<()> {
          ON CONFLICT(key) DO UPDATE SET value = excluded.value",
         params![key, val_to_store],
     )?;
+    Ok(())
+}
+
+pub fn recover_from_vault(conn: &Connection, vault: &VaultManager) -> Result<()> {
+    let keys = vault.get_all_critical_keys();
+    for (key, value) in keys {
+        // Check if already exists in DB
+        if let Ok(None) = get_setting(conn, &key) {
+            set_setting(conn, &key, &value, None)?;
+        }
+    }
     Ok(())
 }
 

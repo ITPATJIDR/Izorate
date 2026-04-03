@@ -214,26 +214,33 @@ export const AIPanel = memo(({ width = 280, activeChatId, onToggleCollapse }: AI
 		console.log("Starting graph extraction for chat:", activeChatId);
 		try {
 			const graphData = await extractGraphFromContext(ctx.text);
-			console.log("Extracted graph data:", graphData);
+			console.log("Extracted graph data from AI:", graphData);
 
-			if (graphData.entities.length > 0) {
+			if (graphData.entities && graphData.entities.length > 0) {
 				const sanitizedData = {
-					entities: graphData.entities.map(e => ({
-						id: String(e.id).toLowerCase().trim(),
-						node_type: e.type || e.node_type || "Entity",
-						properties: typeof e.properties === 'object' ? JSON.stringify(e.properties) : String(e.properties || "")
-					})),
-					relationships: (graphData.relationships || []).map(r => ({
-						source: String(r.source).toLowerCase().trim(),
-						target: String(r.target).toLowerCase().trim(),
-						rel_type: r.type || r.rel_type || "DEPENDS_ON"
-					}))
+					entities: graphData.entities
+						.filter((e: any) => e && (e.id || e.id === 0)) // Ensure ID exists
+						.map((e: any) => ({
+							id: String(e.id).toLowerCase().trim(),
+							node_type: e.type || e.node_type || e.label || "Entity",
+							properties: typeof e.properties === 'object' ? JSON.stringify(e.properties) : String(e.properties || "")
+						})),
+					relationships: (graphData.relationships || []).map((r: any) => ({
+						source: String(r.source || r.source_id || r.from || "").toLowerCase().trim(),
+						target: String(r.target || r.target_id || r.to || "").toLowerCase().trim(),
+						rel_type: r.rel_type || r.type || r.label || "DEPENDS_ON"
+					})).filter(r => r.source && r.target) // Ensure source and target are not empty
 				};
-				console.log("Sending sanitized graph data to backend:", sanitizedData);
-				await invoke("add_chat_graph", { chatId: activeChatId, data: sanitizedData });
-				console.log("Graph data saved successfully");
+
+				if (sanitizedData.entities.length > 0) {
+					console.log("Sending sanitized graph data to backend:", sanitizedData);
+					await invoke("add_chat_graph", { chatId: activeChatId, data: sanitizedData });
+					console.log("Graph data saved successfully");
+				} else {
+					console.warn("No valid entities found after sanitization");
+				}
 			} else {
-				console.warn("AI extracted 0 entities from context");
+				console.warn("AI returned empty entities array");
 			}
 		} catch (err: any) {
 			console.error("Failed to extract graph:", err);

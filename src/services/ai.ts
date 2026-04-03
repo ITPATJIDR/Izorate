@@ -82,9 +82,8 @@ export async function extractGraphFromContext(context: string): Promise<{ entiti
    - ถ้าเจอคำสั่ง (Command) ให้มองเป็น Service หรือกระบวนการ
    - ถ้าเจอ Error Message หรือ Stack trace ให้สรุปใจความสั้นๆ เป็น Node 'Error'
    - ถ้าเจอ File path (เช่น /var/log/error.log) ให้มองเป็น 'File' เสมอ (ไม่ใช่ Error)
-   - เชื่อม 'ERRORS_IN' ไปยัง Service ที่เกี่ยวข้องหากเป็น Error Message
 3. **Property Extraction**: ในส่วน properties ให้ใส่ข้อมูลเพิ่มเติมที่สำคัญ เช่น port number, file path, หรือ error code (ถ้ามี)
-4. **No Hallucinations**: สกัดเฉพาะสิ่งที่ปรากฏในข้อความเท่านั้น ห้ามเติมข้อมูลที่ไม่มีหลักฐาน
+4. **No Hallucinations**: สกัดเฉพาะสิ่งที่ปรากฏในข้อความเท่านั้น
 5. **IDs**: Use lowercase and standardized names for IDs to reduce duplicates.
 
 ### EXTREMELY IMPORTANT
@@ -92,15 +91,9 @@ export async function extractGraphFromContext(context: string): Promise<{ entiti
 - **NO markdown code blocks.**
 - **NO preamble or explanation.**
 - **Ensure ALL IDs ARE LOWERCASE strings.**
-- **Format:**
-{
-  "entities": [
-    {"id": "nginx", "type": "Service", "properties": {"version": "v1.18.0"}}
-  ],
-  "relationships": [
-    {"source": "nginx", "target": "port80", "rel_type": "DEPENDS_ON"}
-  ]
-}
+- **Use EXACTLY these field names:**
+  - Nodes: "entities" array with [{"id": "...", "type": "...", "properties": {...}}]
+  - Relationships: "relationships" array with [{"source": "...", "target": "...", "rel_type": "..."}]
 
 Input Context:
 ${context}`;
