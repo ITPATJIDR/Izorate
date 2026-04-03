@@ -34,7 +34,7 @@ export function StatusBar({ session }: StatusBarProps) {
 			} catch (e) {
 				setLatency(null);
 			}
-		}, 2000);
+		}, 60000); // Poll every 1 minute instead of 10s to further reduce VPN connection noise
 
 		// Run once immediately
 		invoke<{ rx: number; tx: number }>("get_ssh_stats", { id: session.id })

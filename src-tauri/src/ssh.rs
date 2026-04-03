@@ -152,8 +152,13 @@ pub async fn connect_to_server(app: AppHandle, id: i64, config: ConnectionConfig
 
     // Spawn task to handle bidirectional IO
     tokio::spawn(async move {
+        let mut keepalive_interval = tokio::time::interval(std::time::Duration::from_secs(20));
         loop {
             tokio::select! {
+                _ = keepalive_interval.tick() => {
+                    // Send an empty global request as a keepalive
+                    let _ = session.send_keepalive(true).await;
+                }
                 // Incoming data from SSH
                 msg = channel.wait() => {
                     match msg {

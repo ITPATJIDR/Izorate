@@ -3,118 +3,118 @@ mod ssh;
 mod network_tools;
 mod graph_db;
 
-use std::sync::Mutex as StdMutex;
+use tokio::sync::Mutex as AsyncMutex;
 use std::fs;
 use std::path::PathBuf;
 use rusqlite::Connection;
 use tauri::{State, AppHandle, Manager, Emitter};
 use db::ConnectionConfig;
 
-struct DbState(StdMutex<Connection>);
+struct DbState(AsyncMutex<Connection>);
 
-struct GraphState(StdMutex<graph_db::GraphManager>);
+struct GraphState(AsyncMutex<graph_db::GraphManager>);
 
-// [ ... db commands stay the same ... ]
+// [ ... db commands ... ]
 #[tauri::command]
-fn get_connections(state: State<DbState>) -> Result<Vec<ConnectionConfig>, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+async fn get_connections(state: State<'_, DbState>) -> Result<Vec<ConnectionConfig>, String> {
+    let conn = state.0.lock().await;
     db::get_all(&conn).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-fn get_groups(state: State<DbState>) -> Result<Vec<String>, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+async fn get_groups(state: State<'_, DbState>) -> Result<Vec<String>, String> {
+    let conn = state.0.lock().await;
     db::get_groups(&conn).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-fn add_group(state: State<DbState>, name: String) -> Result<(), String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+async fn add_group(state: State<'_, DbState>, name: String) -> Result<(), String> {
+    let conn = state.0.lock().await;
     db::ensure_group(&conn, &name).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-fn rename_group(state: State<DbState>, old_name: String, new_name: String) -> Result<(), String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+async fn rename_group(state: State<'_, DbState>, old_name: String, new_name: String) -> Result<(), String> {
+    let conn = state.0.lock().await;
     db::rename_group(&conn, &old_name, &new_name).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-fn delete_group(state: State<DbState>, name: String) -> Result<(), String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+async fn delete_group(state: State<'_, DbState>, name: String) -> Result<(), String> {
+    let conn = state.0.lock().await;
     db::delete_group(&conn, &name).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-fn add_connection(state: State<DbState>, config: ConnectionConfig) -> Result<i64, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+async fn add_connection(state: State<'_, DbState>, config: ConnectionConfig) -> Result<i64, String> {
+    let conn = state.0.lock().await;
     db::insert(&conn, &config).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-fn update_connection(state: State<DbState>, config: ConnectionConfig) -> Result<(), String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+async fn update_connection(state: State<'_, DbState>, config: ConnectionConfig) -> Result<(), String> {
+    let conn = state.0.lock().await;
     db::update(&conn, &config).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-fn delete_connection(state: State<DbState>, id: i64) -> Result<(), String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+async fn delete_connection(state: State<'_, DbState>, id: i64) -> Result<(), String> {
+    let conn = state.0.lock().await;
     db::delete(&conn, id).map_err(|e| e.to_string())
 }
 
 // Credential Commands
 #[tauri::command]
-fn get_credentials(state: State<DbState>) -> Result<Vec<db::Credential>, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+async fn get_credentials(state: State<'_, DbState>) -> Result<Vec<db::Credential>, String> {
+    let conn = state.0.lock().await;
     db::get_credentials(&conn).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-fn upsert_credential(state: State<DbState>, cred: db::Credential) -> Result<i64, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+async fn upsert_credential(state: State<'_, DbState>, cred: db::Credential) -> Result<i64, String> {
+    let conn = state.0.lock().await;
     db::upsert_credential(&conn, &cred).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-fn delete_credential(state: State<DbState>, id: i64) -> Result<(), String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+async fn delete_credential(state: State<'_, DbState>, id: i64) -> Result<(), String> {
+    let conn = state.0.lock().await;
     db::delete_credential(&conn, id).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-fn move_connection_group(state: State<DbState>, id: i64, group_name: String) -> Result<(), String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+async fn move_connection_group(state: State<'_, DbState>, id: i64, group_name: String) -> Result<(), String> {
+    let conn = state.0.lock().await;
     db::move_to_group(&conn, id, &group_name).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-fn get_chats(state: State<DbState>) -> Result<Vec<db::Chat>, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+async fn get_chats(state: State<'_, DbState>) -> Result<Vec<db::Chat>, String> {
+    let conn = state.0.lock().await;
     db::get_chats(&conn).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-fn create_chat(state: State<DbState>, title: String) -> Result<i64, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+async fn create_chat(state: State<'_, DbState>, title: String) -> Result<i64, String> {
+    let conn = state.0.lock().await;
     db::create_chat(&conn, &title).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-fn delete_chat(state: State<DbState>, id: i64) -> Result<(), String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+async fn delete_chat(state: State<'_, DbState>, id: i64) -> Result<(), String> {
+    let conn = state.0.lock().await;
     db::delete_chat(&conn, id).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-fn get_messages(state: State<DbState>, chat_id: i64) -> Result<Vec<db::Message>, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+async fn get_messages(state: State<'_, DbState>, chat_id: i64) -> Result<Vec<db::Message>, String> {
+    let conn = state.0.lock().await;
     db::get_messages(&conn, chat_id).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-fn add_message(state: State<DbState>, chat_id: i64, role: String, content: String) -> Result<i64, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+async fn add_message(state: State<'_, DbState>, chat_id: i64, role: String, content: String) -> Result<i64, String> {
+    let conn = state.0.lock().await;
     db::add_message(&conn, chat_id, &role, &content).map_err(|e| e.to_string())
 }
 
@@ -122,7 +122,7 @@ fn add_message(state: State<DbState>, chat_id: i64, role: String, content: Strin
 #[tauri::command]
 async fn connect_ssh(app: AppHandle, state: State<'_, DbState>, id: i64) -> Result<(), String> {
     let config = {
-        let conn = state.0.lock().map_err(|e| e.to_string())?;
+        let conn = state.0.lock().await;
         db::get_all(&conn).unwrap().into_iter().find(|c| c.id == Some(id)).ok_or("Connection not found")?
     };
     ssh::connect_to_server(app, id, config).await
@@ -185,16 +185,16 @@ async fn measure_latency(host: String, port: u16) -> Result<u64, String> {
 }
 
 #[tauri::command]
-fn get_izorate_setting(app: AppHandle, key: String) -> Result<Option<String>, String> {
+async fn get_izorate_setting(app: AppHandle, key: String) -> Result<Option<String>, String> {
     let state = app.state::<DbState>();
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = state.0.lock().await;
     db::get_setting(&conn, &key).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-fn set_izorate_setting(app: AppHandle, key: String, value: String) -> Result<(), String> {
+async fn set_izorate_setting(app: AppHandle, key: String, value: String) -> Result<(), String> {
     let state = app.state::<DbState>();
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = state.0.lock().await;
     db::set_setting(&conn, &key, &value).map_err(|e| e.to_string())
 }
 
@@ -208,46 +208,46 @@ fn emit_terminal_selection(app: AppHandle, text: String, session_name: String, s
 }
 
 #[tauri::command]
-fn get_sanitize_rules(state: tauri::State<'_, DbState>, session_id: i64) -> Result<Vec<db::SanitizeRule>, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+async fn get_sanitize_rules(state: tauri::State<'_, DbState>, session_id: i64) -> Result<Vec<db::SanitizeRule>, String> {
+    let conn = state.0.lock().await;
     db::get_sanitize_rules(&conn, session_id).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-fn add_sanitize_rule(state: tauri::State<'_, DbState>, session_id: i64, pattern: String, replacement: String) -> Result<i64, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+async fn add_sanitize_rule(state: tauri::State<'_, DbState>, session_id: i64, pattern: String, replacement: String) -> Result<i64, String> {
+    let conn = state.0.lock().await;
     db::add_sanitize_rule(&conn, session_id, &pattern, &replacement).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-fn delete_sanitize_rule(state: tauri::State<'_, DbState>, id: i64) -> Result<(), String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+async fn delete_sanitize_rule(state: tauri::State<'_, DbState>, id: i64) -> Result<(), String> {
+    let conn = state.0.lock().await;
     db::delete_sanitize_rule(&conn, id).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-fn save_clipboard_history(app: AppHandle, content: String) -> Result<(), String> {
+async fn save_clipboard_history(app: AppHandle, content: String) -> Result<(), String> {
     let state = app.state::<DbState>();
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let conn = state.0.lock().await;
     db::add_clipboard_history(&conn, &content).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-fn add_chat_graph(state: State<GraphState>, chat_id: i64, data: graph_db::GraphData) -> Result<(), String> {
-    let manager = state.0.lock().map_err(|e| e.to_string())?;
+async fn add_chat_graph(state: State<'_, GraphState>, chat_id: i64, data: graph_db::GraphData) -> Result<(), String> {
+    let manager = state.0.lock().await;
     manager.init_chat_db(chat_id)?;
     manager.add_data(chat_id, data)
 }
 
 #[tauri::command]
-fn get_chat_graph(state: State<GraphState>, chat_id: i64) -> Result<graph_db::GraphData, String> {
-    let manager = state.0.lock().map_err(|e| e.to_string())?;
+async fn get_chat_graph(state: State<'_, GraphState>, chat_id: i64) -> Result<graph_db::GraphData, String> {
+    let manager = state.0.lock().await;
     manager.get_data(chat_id)
 }
 
 #[tauri::command]
-fn get_relevant_graph(state: State<GraphState>, chat_id: i64, query: String) -> Result<graph_db::GraphData, String> {
-    let manager = state.0.lock().map_err(|e| e.to_string())?;
+async fn get_relevant_graph(state: State<'_, GraphState>, chat_id: i64, query: String) -> Result<graph_db::GraphData, String> {
+    let manager = state.0.lock().await;
     manager.get_relevant_data(chat_id, &query)
 }
 
@@ -259,7 +259,7 @@ async fn ping_host(app: AppHandle, state: State<'_, DbState>, host: String, coun
     } else {
         // Run remotely via SSH (Assume Linux/Unix remote)
         let config = {
-            let conn = state.0.lock().map_err(|e| e.to_string())?;
+            let conn = state.0.lock().await;
             db::get_all(&conn).unwrap().into_iter().find(|c| c.id == Some(source_session_id)).ok_or("Session not found")?
         };
         let cmd = format!("ping -c {} {}", count, host);
@@ -276,7 +276,7 @@ async fn traceroute_host(app: AppHandle, state: State<'_, DbState>, host: String
     } else {
         // Run remotely (Assume Linux/Unix remote)
         let config = {
-            let conn = state.0.lock().map_err(|e| e.to_string())?;
+            let conn = state.0.lock().await;
             db::get_all(&conn).unwrap().into_iter().find(|c| c.id == Some(source_session_id)).ok_or("Session not found")?
         };
         let cmd = format!("traceroute -n -w 1 -q 1 {}", host);
@@ -294,7 +294,7 @@ async fn get_local_ports(_app: AppHandle, state: State<'_, DbState>, source_sess
 
     let stdout = {
         let config = {
-            let conn = state.0.lock().map_err(|e| e.to_string())?;
+            let conn = state.0.lock().await;
             db::get_all(&conn).unwrap().into_iter().find(|c| c.id == Some(source_session_id)).ok_or("Session not found")?
         };
         let ssh_config = std::sync::Arc::new(russh::client::Config::default());
@@ -446,7 +446,7 @@ async fn check_tool_availability() -> serde_json::Value {
 async fn save_terminal_video(app: AppHandle, bytes: Vec<u8>, filename: String) -> Result<String, String> {
     let state = app.state::<DbState>();
     let path = {
-        let conn = state.0.lock().map_err(|e| e.to_string())?;
+        let conn = state.0.lock().await;
         db::get_setting(&conn, "recording_path")
             .map_err(|e| e.to_string())?
             .unwrap_or_else(|| std::env::temp_dir().to_string_lossy().to_string())
@@ -480,8 +480,8 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .manage(DbState(StdMutex::new(conn)))
-        .manage(GraphState(StdMutex::new(graph_manager)))
+        .manage(DbState(AsyncMutex::new(conn)))
+        .manage(GraphState(AsyncMutex::new(graph_manager)))
         .manage(ssh::SshManager::new())
         .invoke_handler(tauri::generate_handler![
             get_connections,

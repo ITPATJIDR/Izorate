@@ -20,7 +20,7 @@ fn get_encryption_key() -> [u8; 32] {
     *CRYPTO_KEY.get_or_init(|| {
         let mut builder = IdBuilder::new(Encryption::MD5);
         builder.add_component(HWIDComponent::CPUID);
-        builder.add_component(HWIDComponent::DriveSerial);
+        builder.add_component(HWIDComponent::SystemID);
         
         let mid = builder.build("izorate")
             .unwrap_or_else(|_| "izorate-fallback-key-0000".to_string());
