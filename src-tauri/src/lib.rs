@@ -192,6 +192,23 @@ async fn measure_latency(host: String, port: u16) -> Result<u64, String> {
 }
 
 #[tauri::command]
+async fn list_models_backend(state: State<'_, DbState>, provider: String) -> Result<Vec<String>, String> {
+    let (p, key) = {
+        let conn = state.conn.lock().await;
+        let key_name = match provider.as_str() {
+            "OpenAI" => "openai_api_key",
+            "Anthropic" => "anthropic_api_key",
+            "Google" => "gemini_api_key",
+            _ => return Err("Unsupported provider".to_string()),
+        };
+        let k = db::get_setting(&conn, key_name).map_err(|e| e.to_string())?
+            .ok_or(format!("{} not set", key_name))?;
+        (provider, k)
+    };
+    ai::list_models(&p, &key).await
+}
+
+#[tauri::command]
 async fn get_izorate_setting(state: State<'_, DbState>, key: String) -> Result<Option<String>, String> {
     let conn = state.conn.lock().await;
     db::get_setting(&conn, &key).map_err(|e| e.to_string())
@@ -571,15 +588,16 @@ pub fn run() {
             add_group,
             rename_group,
             delete_group,
-            save_clipboard_history,
-            extract_graph_backend,
-            chat_with_ai_backend,
-            add_chat_graph,
-            get_chat_graph,
-            get_relevant_graph,
-            delete_chat,
-            create_chat,
+            add_connection,
+            update_connection,
+            delete_connection,
+            get_credentials,
+            upsert_credential,
+            delete_credential,
+            move_connection_group,
             get_chats,
+            create_chat,
+            delete_chat,
             get_messages,
             add_message,
             connect_ssh,
@@ -588,28 +606,28 @@ pub fn run() {
             disconnect_ssh,
             get_ssh_stats,
             measure_latency,
-            ssh::list_sftp_directory,
-            ssh::upload_file,
-            ssh::download_file,
             get_izorate_setting,
             set_izorate_setting,
+            emit_terminal_selection,
             get_sanitize_rules,
             add_sanitize_rule,
             delete_sanitize_rule,
+            save_clipboard_history,
+            extract_graph_backend,
+            chat_with_ai_backend,
+            add_chat_graph,
+            get_chat_graph,
+            get_relevant_graph,
             save_terminal_video,
-            emit_terminal_selection,
             ping_host,
             traceroute_host,
             get_local_ports,
             check_port_connectivity,
             check_tool_availability,
             list_models,
-            get_sanitize_rules,
-            add_sanitize_rule,
-            delete_sanitize_rule,
-            add_chat_graph,
-            get_chat_graph,
-            get_relevant_graph
+            ssh::list_sftp_directory,
+            ssh::upload_file,
+            ssh::download_file
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

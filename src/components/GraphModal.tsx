@@ -149,8 +149,12 @@ export const GraphModal = ({ chatId, onClose }: GraphModalProps) => {
 							nodeColor={n => (n as any).color}
 							nodeLabel={n => `[${(n as any).node_type}] ${(n as any).id}\n${(n as any).properties}`}
 							linkLabel={l => (l as any).rel_type}
-							linkDirectionalArrowLength={3.5}
+							linkColor={() => "rgba(255, 255, 255, 0.15)"}
+							linkWidth={1.5}
+							linkDirectionalArrowLength={4}
 							linkDirectionalArrowRelPos={1}
+							linkDirectionalParticles={2}
+							linkDirectionalParticleSpeed={0.005}
 							nodeCanvasObject={(node, ctx, globalScale) => {
 								const label = node.id as string;
 								const fontSize = 12 / globalScale;

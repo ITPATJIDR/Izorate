@@ -40,51 +40,27 @@ pub struct AIMessage {
     pub content: String,
 }
 
-const UNIVERSAL_EXTRACTOR_PROMPT: &str = r#"You are a universal knowledge graph extractor.
-Before extracting, you MUST reason through the input using this internal process:
+const UNIVERSAL_EXTRACTOR_PROMPT: &str = r#"You are a high-precision Knowledge Graph Extractor (SRE & System Architecture focus).
+Extract technical entities and their relationships from the input text into a structured JSON.
 
-STEP 1 — IDENTIFY: What kind of input is this? (log, config, CLI output, SQL, prose, IaC, unknown)
-STEP 2 — SCAN FOR NOUNS: List every named thing (services, machines, files, errors, users, ports, resources...)
-STEP 3 — SCAN FOR VERBS/ACTIONS: List every interaction (connects, deploys, reads, fails, exposes, manages...)
-STEP 4 — MAP TO TYPES: For each noun → pick the closest entity type. If none fits, use "Resource".
-STEP 5 — BUILD RELATIONSHIPS: For each verb/action → link source → target with closest rel_type. If none fits, use "CONNECTS_TO".
-STEP 6 — OUTPUT: Emit only the final JSON.
+ENTITY TYPES:
+Pod, Container, Node, Service, Config, Error, Network, Port, User, File, Database, Queue, Cluster, Volume, Secret, Namespace, Deployment, ReplicaSet, Proxy, Pipeline, Job, Registry, Host, Process, Connection, Token.
 
-This reasoning is internal. OUTPUT ONLY the final JSON.
+RELATIONSHIP TYPES:
+DEPENDS_ON, RUNS_ON, CONNECTS_TO, CONTAINS, EXPOSES, MANAGES, PROXIES, READS_FROM, WRITES_TO, OWNS.
 
-ENTITY TYPES (use "Resource" if nothing fits):
-Service | Config | Error | Container | Network | Port | User | File | Database | Queue | Cluster | Node 
-| Volume | Secret | Namespace | Pod | Deployment | ReplicaSet | Proxy | Pipeline | Job | Stage | Resource 
-| Policy | Role | Bucket | Function | LoadBalancer | Certificate | Endpoint | Region | Zone | Table | Schema 
-| Index | Topic | Subscription | Rule | Gateway | Registry | Repository | Artifact | Environment | Host 
-| Process | Connection | Token | Key
-
-RELATIONSHIP TYPES (use "CONNECTS_TO" if nothing fits):
-DEPENDS_ON | DEFINES | ERRORS_IN | RUNS_ON | CONNECTS_TO | CONTAINS | EXPOSES | MANAGES | PROXIES 
-| DEPLOYS_TO | TRIGGERS | INHERITS | READS_FROM | WRITES_TO | AUTHENTICATES | ROUTES_TO | SCALES 
-| MONITORS | OWNS | REPLICATES
-
-OUTPUT FORMAT (strict, no exceptions):
+OUTPUT JSON FORMAT:
 {
-  "entities": [{"id": "snake_case_id", "type": "...", "properties": {"key": "string"}}],
-  "relationships": [{"source": "id", "target": "id", "rel_type": "..."}]
+  "entities": [{"id": "snake_case_id", "type": "EntityType", "properties": {"key": "val"}}],
+  "relationships": [{"source": "id", "target": "id", "rel_type": "RelType"}]
 }
 
 RULES:
-- Output ONLY raw JSON. No markdown. No explanation.
-- IDs: lowercase snake_case, unique, short.
-- Properties values: strings only, no nested objects.
-- Extract ONLY what is present. Never hallucinate.
-- Merge duplicates into one entity.
-- Unknown format? Apply STEP 1-5 anyway — every input has nouns and verbs.
-- Placeholders like <IP_01> or <SECRET>: use as-is.
-
-FEW-SHOT EXAMPLES:
-Input: "kubectl get pods shows nginx-7f4b5c8d9-abc12 Running on node worker-01"
-Output: {"entities":[{"id":"nginx","type":"Pod","properties":{"full_name":"nginx-7f4b5c8d9-abc12","status":"Running"}},{"id":"worker_01","type":"Node","properties":{}}],"relationships":[{"source":"nginx","target":"worker_01","rel_type":"RUNS_ON"}]}
-
-Input: "docker ps shows redis:7.2 on port 6379 and postgres:16 on port 5432"
-Output: {"entities":[{"id":"redis","type":"Container","properties":{"image":"redis:7.2"}},{"id":"postgres","type":"Container","properties":{"image":"postgres:16"}},{"id":"port_6379","type":"Port","properties":{"port":"6379","protocol":"TCP"}},{"id":"port_5432","type":"Port","properties":{"port":"5432","protocol":"TCP"}}],"relationships":[{"source":"redis","target":"port_6379","rel_type":"EXPOSES"},{"source":"postgres","target":"port_5432","rel_type":"EXPOSES"}]}"#;
+1. Output ONLY RAW JSON.
+2. IDs: Keep them short, unique, and lowercase snake_case.
+3. Properties: Flatten all values to strings.
+4. If input is a log/config, focus on the structural components (who connects to whom, what is running where).
+5. Extract only what is explicitly present."#;
 
 pub async fn call_ai_backend(
     provider: &str,
@@ -130,6 +106,13 @@ pub async fn call_ai_backend(
                 .await
                 .map_err(|e| e.to_string())?;
 
+            let status = res.status();
+            if !status.is_success() {
+                let err_body = res.text().await.unwrap_or_default();
+                println!("--- [OPENAI ERROR {}] ---\n{}\n------------------", status, err_body);
+                return Err(format!("OpenAI API Error ({}): {}", status, err_body));
+            }
+
             let v: Value = res.json().await.map_err(|e| e.to_string())?;
             v["choices"][0]["message"]["content"].as_str().map(|s| s.to_string()).ok_or_else(|| format!("AI Error: {:?}", v))?
         },
@@ -146,7 +129,7 @@ pub async fn call_ai_backend(
                 ],
                 "system": system_msg,
                 "temperature": 0.0,
-                "max_tokens": 4096,
+                "max_tokens": 8192,
             });
 
             let res = client.post("https://api.anthropic.com/v1/messages")
@@ -155,6 +138,13 @@ pub async fn call_ai_backend(
                 .send()
                 .await
                 .map_err(|e| e.to_string())?;
+
+            let status = res.status();
+            if !status.is_success() {
+                let err_body = res.text().await.unwrap_or_default();
+                println!("--- [ANTHROPIC ERROR {}] ---\n{}\n------------------", status, err_body);
+                return Err(format!("Anthropic API Error ({}): {}", status, err_body));
+            }
 
             let v: Value = res.json().await.map_err(|e| e.to_string())?;
             v["content"][0]["text"].as_str().map(|s| s.to_string()).ok_or_else(|| format!("AI Error: {:?}", v))?
@@ -165,17 +155,27 @@ pub async fn call_ai_backend(
                 model, api_key
             );
 
+            // Use official system_instruction field for better instruction following
+            let mut generation_config = serde_json::json!({
+                "temperature": 0.1,
+                "maxOutputTokens": 16384,
+            });
+
+            if json_mode {
+                generation_config.as_object_mut().unwrap().insert("responseMimeType".to_string(), serde_json::json!("application/json"));
+            }
+
             let body = serde_json::json!({
+                "system_instruction": {
+                    "parts": [{"text": system_msg}]
+                },
                 "contents": [
                     {
                         "role": "user",
-                        "parts": [{"text": format!("System: {}\n\nUser: {}", system_msg, user_msg)}]
+                        "parts": [{"text": user_msg}]
                     }
                 ],
-                "generationConfig": {
-                    "temperature": 0.1,
-                    "maxOutputTokens": 4096,
-                }
+                "generationConfig": generation_config
             });
 
             let res = client.post(url)
@@ -184,8 +184,34 @@ pub async fn call_ai_backend(
                 .await
                 .map_err(|e| e.to_string())?;
 
+            let status = res.status();
+            if !status.is_success() {
+                let err_body = res.text().await.unwrap_or_default();
+                println!("--- [GOOGLE ERROR {}] ---\n{}\n------------------", status, err_body);
+                return Err(format!("Google API Error ({}): {}", status, err_body));
+            }
+
             let v: Value = res.json().await.map_err(|e| e.to_string())?;
-            v["candidates"][0]["content"]["parts"][0]["text"].as_str().map(|s| s.to_string()).ok_or_else(|| format!("AI Error: {:?}", v))?
+            
+            // Handle empty candidates (safety filters often cause this)
+            let candidates = v["candidates"].as_array();
+            if candidates.map_or(true, |a| a.is_empty()) {
+                println!("--- [GOOGLE NO CANDIDATES] ---\n{:?}\n------------------", v);
+                return Err("Google AI returned no candidates. This usually happens due to safety filters or invalid model names.".to_string());
+            }
+
+            let candidate = &v["candidates"][0];
+            
+            // Check why it finished
+            if let Some(reason) = candidate["finishReason"].as_str() {
+                if reason == "MAX_TOKENS" {
+                    println!("--- [GOOGLE WARNING: TRUNCATED DUE TO MAX_TOKENS] ---");
+                } else if reason != "STOP" && reason != "SUCCESS" {
+                     println!("--- [GOOGLE WARNING: FINISH REASON {}] ---", reason);
+                }
+            }
+
+            candidate["content"]["parts"][0]["text"].as_str().map(|s| s.to_string()).ok_or_else(|| format!("AI Error (No Text): {:?}", v))?
         },
         _ => return Err("Unsupported provider".to_string()),
     };
@@ -195,6 +221,32 @@ pub async fn call_ai_backend(
     println!("--- [END RESPONSE] ---\n");
 
     Ok(response_text)
+}
+
+pub async fn list_models(provider: &str, api_key: &str) -> Result<Vec<String>, String> {
+    let client = reqwest::Client::new();
+    match provider {
+        "Google" => {
+            let url = format!("https://generativelanguage.googleapis.com/v1beta/models?key={}", api_key);
+            let res = client.get(url).send().await.map_err(|e| e.to_string())?;
+            let v: Value = res.json().await.map_err(|e| e.to_string())?;
+            
+            let mut models = Vec::new();
+            if let Some(arr) = v["models"].as_array() {
+                for m in arr {
+                    if let Some(name) = m["name"].as_str() {
+                        models.push(name.replace("models/", ""));
+                    }
+                }
+            }
+            Ok(models)
+        },
+        "OpenAI" => {
+            // Placeholder for OpenAI model list if needed
+            Ok(vec!["gpt-4o".to_string(), "gpt-4o-mini".to_string()])
+        },
+        _ => Err("Unsupported provider for listing models".to_string()),
+    }
 }
 
 pub fn clean_input(input: &str) -> String {

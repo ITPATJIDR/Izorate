@@ -244,6 +244,13 @@ export const AIPanel = memo(({ width = 280, activeChatId, onToggleCollapse }: AI
 			}
 		} catch (err: any) {
 			console.error("Failed to extract graph:", err);
+			const errMsg = typeof err === 'string' ? err : (err?.message || "Extraction Failed");
+			setAiStatus(`⚠️ ${errMsg}`);
+			// Keep the status for a bit so user can see it
+			setTimeout(() => {
+				if (isGenerating) setAiStatus("Thinking...");
+				else setAiStatus("");
+			}, 5000);
 		} finally {
 			setIsExtractingGraph(false);
 		}
@@ -358,9 +365,10 @@ export const AIPanel = memo(({ width = 280, activeChatId, onToggleCollapse }: AI
 			setMessages(final);
 
 		} catch (err: any) {
-			console.error(err);
-			// Show error in chat
-			const errMsg = err?.message || "Error contacting AI service. Please check your API key in Settings.";
+			console.error("AI Error:", err);
+			// Tauri invoke errors are often just strings or { message: string }
+			const errMsg = typeof err === 'string' ? err : (err?.message || "Error contacting AI service. Please check your API key in Settings.");
+
 			setMessages(prev => [...prev, {
 				id: Date.now(),
 				chat_id: activeChatId,
