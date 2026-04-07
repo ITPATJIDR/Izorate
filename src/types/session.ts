@@ -1,4 +1,4 @@
-export type SessionType = "ssh" | "sftp" | "rdp" | "telnet";
+export type SessionType = "ssh" | "sftp" | "rdp" | "telnet" | "s3";
 export type SessionStatus = "connected" | "disconnected" | "connecting";
 
 export interface Session {
@@ -30,4 +30,5 @@ export const TYPE_ICON: Record<SessionType, string> = {
   sftp: "📁",
   rdp: "🖥",
   telnet: "📡",
+  s3: "☁",
 };

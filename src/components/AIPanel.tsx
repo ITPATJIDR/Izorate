@@ -112,6 +112,13 @@ export const AIPanel = memo(({ width = 280, activeChatId, onToggleCollapse }: AI
 		checkAiStatus();
 	}, [activeChatId, checkAiStatus]);
 
+	// Auto-select model if current is invalid
+	useEffect(() => {
+		if (availableModels.length > 0 && (!currentModel || !availableModels.includes(currentModel))) {
+			handleModelChange(availableModels[0]);
+		}
+	}, [availableModels, currentModel]);
+
 	useEffect(() => {
 		const unlisten = listen<{ text: string, sessionName: string, sessionId: number }>("terminal-selection-to-ai", async (event) => {
 			const { text, sessionName, sessionId } = event.payload;
@@ -278,10 +285,14 @@ export const AIPanel = memo(({ width = 280, activeChatId, onToggleCollapse }: AI
 	}, [activeChatId]);
 
 	useEffect(() => {
-		if (scrollRef.current) {
-			scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+		if (scrollRef.current && !loading) {
+			const scroll = scrollRef.current;
+			// Use requestAnimationFrame to ensure DOM is updated
+			requestAnimationFrame(() => {
+				scroll.scrollTop = scroll.scrollHeight;
+			});
 		}
-	}, [messages]);
+	}, [messages, loading]);
 
 	const removeContext = (id: string) => {
 		setContexts(prev => prev.filter(c => c.id !== id));
@@ -405,6 +416,21 @@ export const AIPanel = memo(({ width = 280, activeChatId, onToggleCollapse }: AI
 					>
 						<span>{isExtractingGraph ? "⚡" : "🕸️"}</span>
 						<span className="hidden group-hover:inline">Graph</span>
+					</button>
+				)}
+				{activeChatId && (
+					<button
+						onClick={() => {
+							setLoading(true);
+							invoke<Message[]>("get_messages", { chatId: activeChatId })
+								.then(setMessages)
+								.catch(console.error)
+								.finally(() => setLoading(false));
+						}}
+						className="text-[10px] px-2 py-0.5 rounded border border-[var(--border-focus)] transition-all text-[var(--text-muted)] hover:text-[var(--accent-primary)] hover:border-[var(--accent-primary)]"
+						title="Refresh Chat History"
+					>
+						⟳
 					</button>
 				)}
 				{(activeChatId && (isGenerating || !hasApiKey)) && (

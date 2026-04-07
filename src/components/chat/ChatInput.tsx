@@ -112,7 +112,7 @@ export const ChatInput = ({
 									<option key={m} value={m} className="bg-[var(--bg-surface)]">{m}</option>
 								))
 							) : (
-								<option value="">{currentProvider === "Anthropic" ? "standard" : "No models"}</option>
+								<option value="">No models found</option>
 							)}
 						</select>
 					</div>

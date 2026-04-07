@@ -23,6 +23,7 @@ const DEFAULT_PORTS: Record<SessionType, number> = {
 	sftp: 22,
 	rdp: 3389,
 	telnet: 23,
+	s3: 443,
 };
 
 const PROTOCOL_OPTIONS: { value: SessionType; label: string; icon: string }[] = [
@@ -30,6 +31,7 @@ const PROTOCOL_OPTIONS: { value: SessionType; label: string; icon: string }[] = 
 	{ value: "sftp", label: "SFTP", icon: "📁" },
 	{ value: "rdp", label: "RDP", icon: "🖥" },
 	{ value: "telnet", label: "Telnet", icon: "📡" },
+	{ value: "s3", label: "S3", icon: "☁" },
 ];
 
 function ThemedSelect({
@@ -215,9 +217,9 @@ export function NewConnectionModal({ onClose, onSaved, editSession }: Props) {
 
 					<div className="flex gap-2">
 						<div className="flex-1">
-							<Field label="Host / IP" required>
+							<Field label={form.conn_type === "s3" ? "Region" : "Host / IP"} required>
 								<Input
-									placeholder="10.0.1.10"
+									placeholder={form.conn_type === "s3" ? "us-east-1" : "10.0.1.10"}
 									value={form.host}
 									onChange={v => handleChange("host", v)}
 								/>
@@ -226,7 +228,7 @@ export function NewConnectionModal({ onClose, onSaved, editSession }: Props) {
 						<div style={{ width: "80px" }}>
 							<Field label="Port">
 								<Input
-									placeholder="22"
+									placeholder={form.conn_type === "s3" ? "443" : "22"}
 									value={String(form.port)}
 									onChange={v => handleChange("port", Number(v))}
 									type="number"
@@ -251,17 +253,17 @@ export function NewConnectionModal({ onClose, onSaved, editSession }: Props) {
 						</Field>
 					)}
 
-					<Field label="Username" required>
+					<Field label={form.conn_type === "s3" ? "Access Key ID" : "Username"} required>
 						<Input
-							placeholder="root"
+							placeholder={form.conn_type === "s3" ? "AKIA..." : "root"}
 							value={form.username}
 							onChange={v => handleChange("username", v)}
 						/>
 					</Field>
 
-					<Field label="Password">
+					<Field label={form.conn_type === "s3" ? "Secret Access Key" : "Password"}>
 						<Input
-							placeholder={editSession?.password ? "●●●●●●●● (Saved)" : (editSession ? "leave blank to keep unchanged" : "leave blank to prompt in terminal")}
+							placeholder={form.conn_type === "s3" ? "Secret Key" : (editSession?.password ? "●●●●●●●● (Saved)" : (editSession ? "leave blank to keep unchanged" : "leave blank to prompt in terminal"))}
 							value={form.password}
 							onChange={v => handleChange("password", v)}
 							type="password"

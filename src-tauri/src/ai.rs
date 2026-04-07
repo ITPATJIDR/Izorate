@@ -241,9 +241,53 @@ pub async fn list_models(provider: &str, api_key: &str) -> Result<Vec<String>, S
             }
             Ok(models)
         },
+        "Anthropic" => {
+            let mut headers = HeaderMap::new();
+            headers.insert("x-api-key", HeaderValue::from_str(api_key).map_err(|e| e.to_string())?);
+            headers.insert("anthropic-version", HeaderValue::from_static("2023-06-01"));
+
+            let res = client.get("https://api.anthropic.com/v1/models")
+                .headers(headers)
+                .send()
+                .await
+                .map_err(|e| e.to_string())?;
+            
+            let v: Value = res.json().await.map_err(|e| e.to_string())?;
+            let mut models = Vec::new();
+            if let Some(arr) = v["data"].as_array() {
+                for m in arr {
+                    if let Some(id) = m["id"].as_str() {
+                        models.push(id.to_string());
+                    }
+                }
+            }
+            Ok(models)
+        },
         "OpenAI" => {
-            // Placeholder for OpenAI model list if needed
-            Ok(vec!["gpt-4o".to_string(), "gpt-4o-mini".to_string()])
+            let mut headers = HeaderMap::new();
+            headers.insert("Authorization", HeaderValue::from_str(&format!("Bearer {}", api_key)).map_err(|e| e.to_string())?);
+
+            let res = client.get("https://api.openai.com/v1/models")
+                .headers(headers)
+                .send()
+                .await
+                .map_err(|e| e.to_string())?;
+            
+            let v: Value = res.json().await.map_err(|e| e.to_string())?;
+            let mut models = Vec::new();
+            if let Some(arr) = v["data"].as_array() {
+                for m in arr {
+                    if let Some(id) = m["id"].as_str() {
+                        // Filter for common chat models to avoid clutter
+                        if id.starts_with("gpt-") || id.starts_with("o1-") {
+                            models.push(id.to_string());
+                        }
+                    }
+                }
+            }
+            // Sort models roughly by recency/importance (descending)
+            models.sort_by(|a, b| b.cmp(a));
+            Ok(models)
         },
         _ => Err("Unsupported provider for listing models".to_string()),
     }

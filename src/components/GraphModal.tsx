@@ -8,6 +8,8 @@ interface Node {
 	properties: string;
 	color?: string;
 	name?: string;
+	x?: number;
+	y?: number;
 }
 
 interface Link {
@@ -55,6 +57,9 @@ export const GraphModal = ({ chatId, onClose }: GraphModalProps) => {
 	const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
 	const containerRef = useRef<HTMLDivElement>(null);
 	const graphRef = useRef<any>(null);
+	const [searchQuery, setSearchQuery] = useState("");
+	const [showSearch, setShowSearch] = useState(false);
+	const searchInputRef = useRef<HTMLInputElement>(null);
 
 	useEffect(() => {
 		if (!containerRef.current) return;
@@ -71,6 +76,39 @@ export const GraphModal = ({ chatId, onClose }: GraphModalProps) => {
 		resizeObserver.observe(containerRef.current);
 		return () => resizeObserver.disconnect();
 	}, []);
+
+	useEffect(() => {
+		const handleKeyDown = (e: KeyboardEvent) => {
+			if ((e.ctrlKey || e.metaKey) && e.key === "f") {
+				e.preventDefault();
+				setShowSearch(true);
+				setTimeout(() => searchInputRef.current?.focus(), 100);
+			} else if (e.key === "Escape") {
+				setShowSearch(false);
+			}
+		};
+		window.addEventListener("keydown", handleKeyDown);
+		return () => window.removeEventListener("keydown", handleKeyDown);
+	}, []);
+
+	const handleSearch = (e: React.FormEvent) => {
+		e.preventDefault();
+		const node = data.nodes.find(n =>
+			n.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+			n.properties.toLowerCase().includes(searchQuery.toLowerCase())
+		);
+		if (node && graphRef.current) {
+			graphRef.current.centerAt(node.x, node.y, 1000);
+			graphRef.current.zoom(2.5, 1000);
+		}
+	};
+
+	const getGraphSize = () => {
+		const bytes = JSON.stringify(data).length;
+		if (bytes > 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+		if (bytes > 1024) return `${(bytes / 1024).toFixed(2)} KB`;
+		return `${bytes} B`;
+	};
 
 	useEffect(() => {
 		const loadGraph = async () => {
@@ -130,6 +168,22 @@ export const GraphModal = ({ chatId, onClose }: GraphModalProps) => {
 
 				{/* Content */}
 				<div ref={containerRef} className="flex-1 relative bg-[#050505] overflow-hidden cursor-move">
+					{showSearch && (
+						<div className="absolute top-4 right-4 z-[10] bg-[var(--bg-surface)] border border-[var(--border-focus)] p-2 rounded shadow-2xl flex items-center gap-2">
+							<form onSubmit={handleSearch} className="flex items-center gap-2">
+								<input
+									ref={searchInputRef}
+									type="text"
+									placeholder="Search nodes..."
+									value={searchQuery}
+									onChange={e => setSearchQuery(e.target.value)}
+									className="text-xs px-2 py-1 bg-[var(--bg-base)] border border-[var(--border-focus)] outline-none focus:border-[var(--accent-primary)] w-48 text-white"
+								/>
+								<button type="submit" className="text-[10px] bg-[var(--accent-primary)]/20 px-2 py-1 border border-[var(--accent-primary)]/50 text-[var(--accent-primary)] font-bold uppercase">Find</button>
+								<button type="button" onClick={() => setShowSearch(false)} className="text-[var(--text-muted)] hover:text-white">✕</button>
+							</form>
+						</div>
+					)}
 					{loading ? (
 						<div className="absolute inset-0 flex items-center justify-center text-[var(--accent-primary)] animate-pulse uppercase font-black tracking-widest">
 							Generating Graph Projection...
@@ -181,8 +235,14 @@ export const GraphModal = ({ chatId, onClose }: GraphModalProps) => {
 
 				{/* Footer Controls */}
 				<div className="px-6 py-3 border-t bg-[var(--bg-surface)] flex items-center justify-between" style={{ borderColor: "var(--border-focus)" }}>
-					<div className="text-[9px] text-[var(--text-muted)] uppercase tracking-tighter">
-						Double click to focus • Scroll to zoom • Drag to navigate
+					<div className="flex items-center gap-4">
+						<div className="text-[9px] text-[var(--text-muted)] uppercase tracking-tighter">
+							Double click to focus • Scroll to zoom • Drag to navigate • Ctrl+F to search
+						</div>
+						<div className="h-3 w-px bg-[var(--border-focus)]" />
+						<div className="text-[9px] text-[var(--accent-primary)]/60 font-bold uppercase tracking-widest">
+							Graph Size: {getGraphSize()}
+						</div>
 					</div>
 					<button
 						onClick={() => graphRef.current?.zoomToFit(400)}

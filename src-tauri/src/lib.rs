@@ -5,6 +5,7 @@ mod graph_db;
 mod crypto;
 mod vault;
 mod ai;
+// use aws_sdk_s3 as s3;
 
 use tokio::sync::Mutex as AsyncMutex;
 use std::fs;
@@ -20,6 +21,20 @@ struct DbState {
 }
 
 struct GraphState(AsyncMutex<graph_db::GraphManager>);
+
+// #[derive(serde::Serialize, serde::Deserialize)]
+// pub struct S3Bucket {
+//     pub name: String,
+//     pub created_at: Option<String>,
+// }
+
+// #[derive(serde::Serialize, serde::Deserialize)]
+// pub struct S3Object {
+//     pub key: String,
+//     pub size: u64,
+//     pub last_modified: Option<String>,
+//     pub is_dir: bool,
+// }
 
 // [ ... db commands ... ]
 #[tauri::command]
@@ -114,6 +129,12 @@ async fn delete_chat(state: State<'_, DbState>, id: i64) -> Result<(), String> {
 }
 
 #[tauri::command]
+async fn update_chat_title(state: State<'_, DbState>, id: i64, title: String) -> Result<(), String> {
+    let conn = state.conn.lock().await;
+    db::update_chat_title(&conn, id, &title).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 async fn get_messages(state: State<'_, DbState>, chat_id: i64) -> Result<Vec<db::Message>, String> {
     let conn = state.conn.lock().await;
     db::get_messages(&conn, chat_id).map_err(|e| e.to_string())
@@ -191,22 +212,6 @@ async fn measure_latency(host: String, port: u16) -> Result<u64, String> {
     }
 }
 
-#[tauri::command]
-async fn list_models_backend(state: State<'_, DbState>, provider: String) -> Result<Vec<String>, String> {
-    let (p, key) = {
-        let conn = state.conn.lock().await;
-        let key_name = match provider.as_str() {
-            "OpenAI" => "openai_api_key",
-            "Anthropic" => "anthropic_api_key",
-            "Google" => "gemini_api_key",
-            _ => return Err("Unsupported provider".to_string()),
-        };
-        let k = db::get_setting(&conn, key_name).map_err(|e| e.to_string())?
-            .ok_or(format!("{} not set", key_name))?;
-        (provider, k)
-    };
-    ai::list_models(&p, &key).await
-}
 
 #[tauri::command]
 async fn get_izorate_setting(state: State<'_, DbState>, key: String) -> Result<Option<String>, String> {
@@ -452,72 +457,105 @@ async fn check_port_connectivity(host: String, port: u16) -> Result<serde_json::
 
 #[tauri::command]
 async fn list_models(provider: String, api_key: String) -> Result<Vec<String>, String> {
-    let client = reqwest::Client::new();
-    
-    match provider.as_str() {
-        "OpenAI" => {
-            let res = client.get("https://api.openai.com/v1/models")
-                .header("Authorization", format!("Bearer {}", api_key))
-                .send()
-                .await
-                .map_err(|e| e.to_string())?;
-                
-            let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
-            let mut models = Vec::new();
-            if let Some(data) = json.get("data").and_then(|d| d.as_array()) {
-                for m in data {
-                    if let Some(id) = m.get("id").and_then(|i| i.as_str()) {
-                        // Filter for common chat models to keep list useful
-                        if id.starts_with("gpt-") || id.contains("o1") {
-                            models.push(id.to_string());
-                        }
-                    }
-                }
-            }
-            models.sort();
-            Ok(models)
-        },
-        "Anthropic" => {
-            // Anthropic doesn't have a public list models API yet.
-            // Returning standard ones.
-            Ok(vec![
-                "claude-3-5-sonnet-20240620".to_string(),
-                "claude-3-opus-20240229".to_string(),
-                "claude-3-haiku-20240307".to_string(),
-                "claude-2.1".to_string(),
-            ])
-        },
-        "Google" => {
-            let url = format!("https://generativelanguage.googleapis.com/v1beta/models?key={}", api_key);
-            let res = client.get(&url)
-                .send()
-                .await
-                .map_err(|e| e.to_string())?;
-                
-            let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
-            let mut models = Vec::new();
-            if let Some(data) = json.get("models").and_then(|d| d.as_array()) {
-                for m in data {
-                    if let Some(name) = m.get("name").and_then(|n| n.as_str()) {
-                        // name is like "models/gemini-pro"
-                        let short_name = name.strip_prefix("models/").unwrap_or(name);
-                        if short_name.contains("gemini") {
-                            models.push(short_name.to_string());
-                        }
-                    }
-                }
-            }
-            models.sort();
-            Ok(models)
-        },
-        _ => Err("Unsupported provider for listing models".to_string())
-    }
+    ai::list_models(&provider, &api_key).await
 }
 
 #[tauri::command]
 async fn check_tool_availability() -> serde_json::Value {
     network_tools::check_availability().await
 }
+
+// // S3 Commands helper and implementations
+// async fn get_s3_client(region: String, access_key: String, secret_key: String) -> aws_sdk_s3::Client {
+//     let credentials = aws_sdk_s3::config::Credentials::new(
+//         access_key,
+//         secret_key,
+//         None,
+//         None,
+//         "izorate"
+//     );
+//     let region = aws_sdk_s3::config::Region::new(region);
+//     let config = aws_sdk_s3::Config::builder()
+//         .credentials_provider(credentials)
+//         .region(region)
+//         .build();
+//     aws_sdk_s3::Client::from_conf(config)
+// }
+// 
+// #[tauri::command]
+// async fn list_s3_buckets(state: State<'_, DbState>, id: i64) -> Result<Vec<S3Bucket>, String> {
+//     let config = {
+//         let conn = state.conn.lock().await;
+//         db::get_all(&conn).unwrap().into_iter().find(|c| c.id == Some(id)).ok_or("Connection not found")?
+//     };
+//     
+//     let client = get_s3_client(config.host, config.username, config.password.unwrap_or_default()).await;
+//     let resp = client.list_buckets().send().await.map_err(|e| e.to_string())?;
+//     
+//     let buckets = resp.buckets().iter().map(|b| S3Bucket {
+//         name: b.name().unwrap_or("").to_string(),
+//         created_at: b.creation_date().map(|d| d.to_string()),
+//     }).collect();
+//     
+//     Ok(buckets)
+// }
+// 
+// #[tauri::command]
+// async fn list_s3_objects(state: State<'_, DbState>, id: i64, bucket: String, prefix: String) -> Result<Vec<S3Object>, String> {
+//     let config = {
+//         let conn = state.conn.lock().await;
+//         db::get_all(&conn).unwrap().into_iter().find(|c| c.id == Some(id)).ok_or("Connection not found")?
+//     };
+//     
+//     let client = get_s3_client(config.host, config.username, config.password.unwrap_or_default()).await;
+//     let resp = client.list_objects_v2()
+//         .bucket(&bucket)
+//         .prefix(&prefix)
+//         .delimiter("/")
+//         .send().await.map_err(|e| e.to_string())?;
+//     
+//     let mut objects = Vec::new();
+//     
+//     // Folders
+//     if let Some(cp) = resp.common_prefixes() {
+//         for p in cp {
+//             objects.push(S3Object {
+//                 key: p.prefix().unwrap_or("").to_string(),
+//                 size: 0,
+//                 last_modified: None,
+//                 is_dir: true,
+//             });
+//         }
+//     }
+//     
+//     // Files
+//     if let Some(cont) = resp.contents() {
+//         for o in cont {
+//             let key = o.key().unwrap_or("").to_string();
+//             if key == prefix { continue; }
+//             objects.push(S3Object {
+//                 key,
+//                 size: o.size().unwrap_or(0) as u64,
+//                 last_modified: o.last_modified().map(|d| d.to_string()),
+//                 is_dir: false,
+//             });
+//         }
+//     }
+//     
+//     Ok(objects)
+// }
+// 
+// #[tauri::command]
+// async fn delete_s3_object(state: State<'_, DbState>, id: i64, bucket: String, key: String) -> Result<(), String> {
+//     let config = {
+//         let conn = state.conn.lock().await;
+//         db::get_all(&conn).unwrap().into_iter().find(|c| c.id == Some(id)).ok_or("Connection not found")?
+//     };
+//     
+//     let client = get_s3_client(config.host, config.username, config.password.unwrap_or_default()).await;
+//     client.delete_object().bucket(bucket).key(key).send().await.map_err(|e| e.to_string())?;
+//     Ok(())
+// }
 
 #[tauri::command]
 async fn save_terminal_video(state: State<'_, DbState>, bytes: Vec<u8>, filename: String) -> Result<String, String> {
@@ -625,6 +663,10 @@ pub fn run() {
             check_port_connectivity,
             check_tool_availability,
             list_models,
+            update_chat_title,
+//            list_s3_buckets,
+//            list_s3_objects,
+//            delete_s3_object,
             ssh::list_sftp_directory,
             ssh::upload_file,
             ssh::download_file

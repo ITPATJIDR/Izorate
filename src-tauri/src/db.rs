@@ -319,6 +319,11 @@ pub fn delete_chat(conn: &Connection, id: i64) -> Result<()> {
     Ok(())
 }
 
+pub fn update_chat_title(conn: &Connection, id: i64, title: &str) -> Result<()> {
+    conn.execute("UPDATE chats SET title=?1 WHERE id=?2", params![title, id])?;
+    Ok(())
+}
+
 pub fn get_messages(conn: &Connection, chat_id: i64) -> Result<Vec<Message>> {
     let mut stmt = conn.prepare("SELECT id, chat_id, role, content, timestamp FROM messages WHERE chat_id=?1 ORDER BY timestamp ASC")?;
     let rows = stmt.query_map(params![chat_id], |row| {

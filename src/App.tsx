@@ -13,6 +13,7 @@ import { AIPanel } from "./components/AIPanel";
 import { AIPage } from "./components/AIPage";
 import { StatusBar } from "./components/StatusBar";
 import { NewConnectionModal } from "./components/NewConnectionModal";
+import { S3Manager } from "./components/S3Manager";
 import type { Session } from "./types/session";
 
 export default function App() {
@@ -206,7 +207,11 @@ export default function App() {
                   }}
                   onClick={() => isMultiExec && setActiveId(id)}
                 >
-                  <TerminalPane session={s} isMultiExec={isMultiExec} isActive={isActive} />
+                  {s.type === "s3" ? (
+                    <S3Manager session={s} />
+                  ) : (
+                    <TerminalPane session={s} isMultiExec={isMultiExec} isActive={isActive} />
+                  )}
                 </div>
               );
             })}

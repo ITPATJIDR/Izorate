@@ -39,6 +39,19 @@ export function AIPage({ activeChatId, onSelectChat }: AIPageProps) {
 		}
 	};
 
+	const handleRenameChat = async (id: number, currentTitle: string, e: React.MouseEvent) => {
+		e.stopPropagation();
+		const newTitle = prompt("Enter new chat title:", currentTitle);
+		if (newTitle && newTitle !== currentTitle) {
+			try {
+				await invoke("update_chat_title", { id, title: newTitle });
+				loadChats();
+			} catch (err) {
+				console.error(err);
+			}
+		}
+	};
+
 	const handleDeleteChat = async (id: number, e: React.MouseEvent) => {
 		e.stopPropagation();
 		if (confirm("Delete this chat and all its messages?")) {
@@ -91,12 +104,21 @@ export function AIPage({ activeChatId, onSelectChat }: AIPageProps) {
 									<h3 className="text-sm font-bold truncate pr-4" style={{ color: activeChatId === chat.id ? "var(--accent-primary)" : "var(--text-main)" }}>
 										{chat.title}
 									</h3>
-									<button
-										onClick={(e) => handleDeleteChat(chat.id!, e)}
-										className="text-xs opacity-40 hover:opacity-100 hover:text-red-400 transition-all"
-									>
-										✕
-									</button>
+									<div className="flex items-center gap-2">
+										<button
+											onClick={(e) => handleRenameChat(chat.id!, chat.title, e)}
+											className="text-[10px] opacity-40 hover:opacity-100 hover:text-[var(--accent-primary)] transition-all"
+											title="Rename Chat"
+										>
+											✎
+										</button>
+										<button
+											onClick={(e) => handleDeleteChat(chat.id!, e)}
+											className="text-xs opacity-40 hover:opacity-100 hover:text-red-400 transition-all"
+										>
+											✕
+										</button>
+									</div>
 								</div>
 								<div className="flex items-center gap-2 mt-4">
 									<span className="text-[10px]" style={{ color: "var(--text-muted)" }}>
