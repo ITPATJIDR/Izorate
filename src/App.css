@@ -69,20 +69,6 @@ body {
   background: rgba(16, 185, 129, 0.8);
 }
 
-/* Scanlines overlay */
-.scanlines::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background: repeating-linear-gradient(0deg,
-      transparent,
-      transparent 2px,
-      rgba(0, 0, 0, 0.15) 2px,
-      rgba(0, 0, 0, 0.15) 4px);
-  pointer-events: none;
-  z-index: 9999;
-}
-
 /* CRT glow */
 .crt-glow {
   text-shadow: 0 0 8px var(--green), 0 0 20px var(--accent-glow);

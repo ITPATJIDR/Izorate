@@ -137,7 +137,7 @@ export default function App() {
   };
 
   return (
-    <div className={`scanlines flex flex-col ${isResizingSidebar || isResizingAiPanel ? 'select-none' : ''}`} style={{ height: "100vh", overflow: "hidden" }}>
+    <div className={`flex flex-col ${isResizingSidebar || isResizingAiPanel ? 'select-none' : ''}`} style={{ height: "100vh", overflow: "hidden" }}>
       <TopBar
         connectedCount={openTabIds.length}
         activeTab={activeTab}
