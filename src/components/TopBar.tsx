@@ -26,7 +26,7 @@ export function TopBar({ connectedCount, activeTab, hasActiveSession, isMultiExe
 
 			{/* Center: Nav */}
 			<div className="flex gap-1">
-				{["Sessions", "Files", "Tools", "Keys", "Settings", "AI Assistant"].map((item) => {
+				{["Sessions", "Files", "Disk", "Keys", "Settings", "AI Assistant"].map((item) => {
 					const isActive = item === activeTab;
 					const isDisabled = item === "Files" && !hasActiveSession;
 					return (

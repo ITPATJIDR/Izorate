@@ -557,6 +557,129 @@ async fn check_tool_availability() -> serde_json::Value {
 //     Ok(())
 // }
 
+#[derive(serde::Serialize, Clone)]
+pub struct DiskPartition {
+    pub filesystem: String,
+    pub size: String,
+    pub used: String,
+    pub available: String,
+    pub use_percent: u8,
+    pub mount_point: String,
+}
+
+#[derive(serde::Serialize, Clone)]
+pub struct DiskTopPath {
+    pub size: String,
+    pub path: String,
+    pub size_bytes: u64,
+}
+
+#[derive(serde::Serialize, Clone)]
+pub struct DiskInfo {
+    pub partitions: Vec<DiskPartition>,
+    pub top_paths: Vec<DiskTopPath>,
+    pub session_name: String,
+    pub session_id: i64,
+}
+
+/// Parse human-readable size like "1.5G", "200M", "512K" -> bytes
+fn parse_human_size(s: &str) -> u64 {
+    let s = s.trim();
+    if s.is_empty() || s == "-" { return 0; }
+    let (num_str, unit) = s.split_at(s.len().saturating_sub(1));
+    let multiplier: u64 = match unit.to_uppercase().as_str() {
+        "T" => 1_099_511_627_776,
+        "G" => 1_073_741_824,
+        "M" => 1_048_576,
+        "K" => 1_024,
+        _ => return s.parse::<u64>().unwrap_or(0),
+    };
+    (num_str.parse::<f64>().unwrap_or(0.0) * multiplier as f64) as u64
+}
+
+#[tauri::command]
+async fn get_disk_info(state: State<'_, DbState>, session_id: i64, password: Option<String>) -> Result<DiskInfo, String> {
+    let config = {
+        let conn = state.conn.lock().await;
+        db::get_all(&conn).unwrap().into_iter().find(|c| c.id == Some(session_id)).ok_or("Session not found")?
+    };
+
+    let session_name = config.name.clone();
+
+    // Build SSH session
+    let ssh_config = std::sync::Arc::new(russh::client::Config::default());
+    let host_port = format!("{}:{}", config.host, config.port);
+    let mut session = russh::client::connect(ssh_config.clone(), host_port, ssh::DummyHandler).await
+        .map_err(|e| format!("Connect error: {}", e))?;
+
+    let pwd = password.or(config.password).ok_or("Password required for disk check")?;
+    let auth = session.authenticate_password(config.username, pwd).await
+        .map_err(|e| format!("Auth error: {}", e))?;
+    if !matches!(auth, russh::client::AuthResult::Success) {
+        return Err("Authentication failed".to_string());
+    }
+
+    // Helper: run a command and collect stdout
+    async fn run_cmd(session: &mut russh::client::Handle<ssh::DummyHandler>, cmd: &str) -> Result<String, String> {
+        let mut channel = session.channel_open_session().await.map_err(|e| e.to_string())?;
+        channel.exec(true, cmd).await.map_err(|e| e.to_string())?;
+        let mut output = String::new();
+        loop {
+            match channel.wait().await {
+                Some(russh::ChannelMsg::Data { ref data }) => output.push_str(&String::from_utf8_lossy(data)),
+                Some(russh::ChannelMsg::Eof) | Some(russh::ChannelMsg::Close) | None => break,
+                _ => {}
+            }
+        }
+        Ok(output)
+    }
+
+    // Run df -Ph (POSIX, human-readable, no wrap)
+    let df_output = run_cmd(&mut session, "df -Ph 2>/dev/null | tail -n +2").await?;
+
+    let mut partitions: Vec<DiskPartition> = Vec::new();
+    for line in df_output.lines() {
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if parts.len() < 6 { continue; }
+        let use_pct_str = parts[4].trim_end_matches('%');
+        let use_percent = use_pct_str.parse::<u8>().unwrap_or(0);
+        // Skip pseudo/virtual filesystems based on mount point
+        let mount = parts[5];
+        if mount.starts_with("/proc") || mount.starts_with("/sys") || mount.starts_with("/dev/pts") || mount == "/dev" {
+            continue;
+        }
+        partitions.push(DiskPartition {
+            filesystem: parts[0].to_string(),
+            size: parts[1].to_string(),
+            used: parts[2].to_string(),
+            available: parts[3].to_string(),
+            use_percent,
+            mount_point: mount.to_string(),
+        });
+    }
+
+    // Run du -sh on common top-level dirs to find largest paths
+    let du_cmd = "du -sh /var /home /opt /usr /tmp /root /srv /data /backup 2>/dev/null | sort -rh | head -10";
+    let du_output = run_cmd(&mut session, du_cmd).await?;
+
+    let mut top_paths: Vec<DiskTopPath> = Vec::new();
+    for line in du_output.lines() {
+        let parts: Vec<&str> = line.splitn(2, '\t').collect();
+        if parts.len() < 2 { continue; }
+        let size_str = parts[0].trim();
+        let path = parts[1].trim().to_string();
+        top_paths.push(DiskTopPath {
+            size: size_str.to_string(),
+            path,
+            size_bytes: parse_human_size(size_str),
+        });
+    }
+    // Sort by size_bytes descending
+    top_paths.sort_by(|a, b| b.size_bytes.cmp(&a.size_bytes));
+
+    Ok(DiskInfo { partitions, top_paths, session_name, session_id })
+}
+
 #[tauri::command]
 async fn save_terminal_video(state: State<'_, DbState>, bytes: Vec<u8>, filename: String) -> Result<String, String> {
     let path = {
@@ -664,6 +787,7 @@ pub fn run() {
             check_tool_availability,
             list_models,
             update_chat_title,
+            get_disk_info,
 //            list_s3_buckets,
 //            list_s3_objects,
 //            delete_s3_object,

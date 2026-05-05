@@ -7,7 +7,7 @@ import { SessionSidebar } from "./components/SessionSidebar";
 import { TerminalPane } from "./components/TerminalPane";
 import { FileManagerPane } from "./components/FileManagerPane";
 import { SettingsPane } from "./components/SettingsPane";
-import { ToolsPane } from "./components/ToolsPane";
+import { DiskPane } from "./components/DiskPane";
 import { KeysPane } from "./components/KeysPane";
 import { AIPanel } from "./components/AIPanel";
 import { AIPage } from "./components/AIPage";
@@ -15,6 +15,13 @@ import { StatusBar } from "./components/StatusBar";
 import { NewConnectionModal } from "./components/NewConnectionModal";
 import { S3Manager } from "./components/S3Manager";
 import type { Session } from "./types/session";
+
+interface DiskInfo {
+  partitions: { filesystem: string; size: string; used: string; available: string; use_percent: number; mount_point: string }[];
+  top_paths: { size: string; path: string; size_bytes: number }[];
+  session_name: string;
+  session_id: number;
+}
 
 export default function App() {
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -26,6 +33,7 @@ export default function App() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [activeChatId, setActiveChatId] = useState<number | null>(null);
   const [isMultiExec, setIsMultiExec] = useState(false);
+  const [diskData, setDiskData] = useState<Record<number, DiskInfo | "loading" | "error">>({});
 
   // Resizable Panels State
   const [sidebarWidth, setSidebarWidth] = useState(220);
@@ -105,6 +113,35 @@ export default function App() {
     setOpenTabIds(prev => prev.filter(id => updated.some(s => s.id === id)));
   };
 
+  // Fetch disk info once on startup, for all SSH/SFTP sessions
+  useEffect(() => {
+    if (sessions.length === 0) return;
+    const sshSessions = sessions.filter(s => s.type === "ssh" || s.type === "sftp");
+    if (sshSessions.length === 0) return;
+    // Only fetch for sessions we haven't fetched yet
+    const toFetch = sshSessions.filter(s => !(s.id in diskData));
+    if (toFetch.length === 0) return;
+
+    // Mark as loading
+    setDiskData(prev => {
+      const next = { ...prev };
+      for (const s of toFetch) next[s.id] = "loading";
+      return next;
+    });
+
+    // Fetch each session in parallel
+    for (const s of toFetch) {
+      invoke<DiskInfo>("get_disk_info", {
+        sessionId: s.id,
+        password: s.password ?? null,
+      })
+        .then(info => setDiskData(prev => ({ ...prev, [s.id]: info })))
+        .catch(() => setDiskData(prev => ({ ...prev, [s.id]: "error" })));
+    }
+  // Only run once when sessions first load (eslint-disable-next-line)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessions]);
+
   const handleDataChanged = (newId?: number) => {
     // Triggers Sidebar to remount/fetch updated connections & groups from SQLite
     setRefreshTrigger(prev => prev + 1);
@@ -135,6 +172,11 @@ export default function App() {
   const handleEditSession = (session: Session) => {
     setEditingSession(session);
     setShowModal(true);
+  };
+
+  const handleOpenSession = (id: number) => {
+    handleSelectSession(id);
+    setActiveTab("Sessions");
   };
 
   return (
@@ -231,8 +273,8 @@ export default function App() {
             <FileManagerPane session={activeSession} />
           )}
 
-          {activeTab === "Tools" && (
-            <ToolsPane sessions={sessions} />
+          {activeTab === "Disk" && (
+            <DiskPane sessions={sessions} diskData={diskData} onOpenSession={handleOpenSession} />
           )}
 
           {activeTab === "Keys" && (

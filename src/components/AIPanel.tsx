@@ -422,13 +422,15 @@ export const AIPanel = memo(({ width = 280, activeChatId, onToggleCollapse }: AI
 					<button
 						onClick={() => {
 							setLoading(true);
+							// Refresh both messages AND model settings
+							checkAiStatus();
 							invoke<Message[]>("get_messages", { chatId: activeChatId })
 								.then(setMessages)
 								.catch(console.error)
 								.finally(() => setLoading(false));
 						}}
 						className="text-[10px] px-2 py-0.5 rounded border border-[var(--border-focus)] transition-all text-[var(--text-muted)] hover:text-[var(--accent-primary)] hover:border-[var(--accent-primary)]"
-						title="Refresh Chat History"
+						title="Refresh Chat & Model Settings"
 					>
 						⟳
 					</button>
