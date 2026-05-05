@@ -142,6 +142,27 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessions]);
 
+  // Re-fetch disk info for specific session IDs (on demand refresh)
+  const refreshDiskSessions = (ids: number[]) => {
+    const toRefresh = sessions.filter(s => ids.includes(s.id) && (s.type === "ssh" || s.type === "sftp"));
+    if (toRefresh.length === 0) return;
+    // Mark as loading
+    setDiskData(prev => {
+      const next = { ...prev };
+      for (const s of toRefresh) next[s.id] = "loading";
+      return next;
+    });
+    // Fetch in parallel
+    for (const s of toRefresh) {
+      invoke<DiskInfo>("get_disk_info", {
+        sessionId: s.id,
+        password: s.password ?? null,
+      })
+        .then(info => setDiskData(prev => ({ ...prev, [s.id]: info })))
+        .catch(() => setDiskData(prev => ({ ...prev, [s.id]: "error" })));
+    }
+  };
+
   const handleDataChanged = (newId?: number) => {
     // Triggers Sidebar to remount/fetch updated connections & groups from SQLite
     setRefreshTrigger(prev => prev + 1);
@@ -274,7 +295,12 @@ export default function App() {
           )}
 
           {activeTab === "Disk" && (
-            <DiskPane sessions={sessions} diskData={diskData} onOpenSession={handleOpenSession} />
+            <DiskPane
+              sessions={sessions}
+              diskData={diskData}
+              onOpenSession={handleOpenSession}
+              onRefreshSessions={refreshDiskSessions}
+            />
           )}
 
           {activeTab === "Keys" && (
